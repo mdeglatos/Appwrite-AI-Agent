@@ -16,7 +16,7 @@ import LoginPage from './components/LoginPage';
 import { getSdkDatabases, getSdkStorage, Query } from './services/appwrite';
 
 // Define tool categories as a top-level constant
-const toolCategories = ['database', 'storage', 'functions'];
+const toolCategories = ['database', 'storage', 'functions', 'users', 'teams'];
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'];
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 

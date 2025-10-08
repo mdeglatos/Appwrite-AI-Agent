@@ -1,5 +1,5 @@
 import { Client, Account, ID, AppwriteException, Query, Permission, Role } from 'appwrite';
-import { Client as NodeClient, Databases, Storage, Functions } from 'node-appwrite';
+import { Client as NodeClient, Databases, Storage, Functions, Users, Teams } from 'node-appwrite';
 import type { AppwriteProject } from '../types';
 import { appwriteConfig } from '../config';
 
@@ -59,6 +59,26 @@ export function getSdkStorage(project: AppwriteProject): Storage {
 export function getSdkFunctions(project: AppwriteProject): Functions {
     const client = createProjectAdminClient(project);
     return new Functions(client);
+}
+
+/**
+ * Returns an Appwrite Users service instance configured for a specific project.
+ * @param project - The Appwrite project to interact with.
+ * @returns A Users service instance from the node-appwrite SDK.
+ */
+export function getSdkUsers(project: AppwriteProject): Users {
+    const client = createProjectAdminClient(project);
+    return new Users(client);
+}
+
+/**
+ * Returns an Appwrite Teams service instance configured for a specific project.
+ * @param project - The Appwrite project to interact with.
+ * @returns A Teams service instance from the node-appwrite SDK.
+ */
+export function getSdkTeams(project: AppwriteProject): Teams {
+    const client = createProjectAdminClient(project);
+    return new Teams(client);
 }
 
 

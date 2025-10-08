@@ -294,7 +294,8 @@ async function createEnumAttribute(context: AIContext, { databaseId, collectionI
 
 async function createRelationshipAttribute(context: AIContext, { databaseId, collectionId, relatedCollectionId, type, twoWay, key, twoWayKey, onDelete }: { databaseId?: string, collectionId?: string, relatedCollectionId: string, type: 'oneToOne' | 'oneToMany' | 'manyToOne' | 'manyToMany', twoWay: boolean, key: string, twoWayKey?: string, onDelete?: 'cascade' | 'restrict' | 'setNull' }) {
     console.log(`Executing createRelationshipAttribute for key '${key}'`);
-    return createAttribute(context, { databaseId, collectionId }, (db, dbId, collId) => db.createRelationshipAttribute(dbId, collId, relatedCollectionId, type as any, twoWay, key, twoWayKey, onDelete));
+    // Fix: Cast `onDelete` to `any` to resolve TypeScript error with Appwrite SDK's RelationMutate type.
+    return createAttribute(context, { databaseId, collectionId }, (db, dbId, collId) => db.createRelationshipAttribute(dbId, collId, relatedCollectionId, type as any, twoWay, key, twoWayKey, onDelete as any));
 }
 
 // Index-level functions
