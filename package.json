@@ -15,7 +15,9 @@
     "appwrite": "^18.2.0",
     "node-appwrite": "^17.2.0",
     "react-icons": "^5.5.0",
-    "marked": "^14.0.0"
+    "marked": "^14.0.0",
+    "tar-js": "0.3.0",
+    "pako": "2.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

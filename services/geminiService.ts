@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, type Chat, type GenerateContentResponse, type Part, type FunctionCall } from '@google/genai';
 import { availableTools, toolDefinitionGroups } from '../tools';
 import type { AIContext, Message, ActionMessage, ModelMessage } from '../types';
@@ -42,6 +43,41 @@ export const createChatSession = (
     }
     systemInstruction += `\n\n**CRITICAL INSTRUCTION:** When a tool has optional parameters (like databaseId, collectionId, bucketId), and the user's command is general (e.g., "delete this collection", "list all documents"), you MUST assume they are referring to the item(s) in the CURRENT active context. You MUST call the appropriate tool using the context IDs without asking the user for confirmation or for the ID.`;
     systemInstruction += `\nFor example, if the user has a collection selected in the context and says "delete the collection", you must call the 'deleteCollection' tool immediately, using the databaseId and collectionId from the context. DO NOT ask "Which collection do you want to delete?".`;
+    
+    systemInstruction += `\n\n**FUNCTION DEVELOPMENT GUIDE:** When asked to create and deploy a function, you must adhere to the following Appwrite Functions development guide for Node.js.
+- **Entrypoint:** The main file (e.g., 'index.js') must export a default async function that accepts a context object. You can destructure it like so: \`export default async ({ req, res, log, error }) => { ... };\`
+- **Request Handling:** Access request data via the \`req\` object. Key properties include:
+  - \`req.bodyJson\`: Parsed JSON body.
+  - \`req.bodyText\`: Raw text body.
+  - \`req.headers\`: An object of request headers.
+  - \`req.method\`: The HTTP method (e.g., 'GET', 'POST').
+  - \`req.query\`: An object of parsed query string parameters.
+- **Response Handling:** Always return a response using the \`res\` object. Common methods are:
+  - \`res.json({ key: 'value' })\`: Sends a JSON response.
+  - \`res.text('Hello World')\`: Sends a plain text response.
+  - \`res.empty()\`: Sends a 204 No Content response.
+- **Logging:** Use \`log('message')\` for standard output and \`error('message')\` for errors. These will appear in the Appwrite Console, not in the function's response.
+- **Environment Variables:** Access both system and custom variables via \`process.env\`. For example, \`process.env.APPWRITE_FUNCTION_PROJECT_ID\` or a custom variable like \`process.env.API_SECRET\`.
+- **Authentication with Appwrite SDK:**
+  - To act as an admin, use the auto-provided API key: \`const client = new Client().setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID).setKey(req.headers['x-appwrite-key']);\`
+  - To act on behalf of the calling user, use their JWT: \`client.setJWT(req.headers['x-appwrite-user-jwt'])\`. Always check if the JWT exists.
+- **Dependencies:** If the function needs external packages (like 'node-appwrite'), you MUST include a 'package.json' file in the deployment package listing these dependencies.
+- **Code Structure:** For complex functions, you can create helper files and use ES module imports (e.g., \`import { helper } from './utils.js';\`). Ensure all necessary files are included in the deployment.
+
+When you use the \`createAndDeployFunction\` tool, you MUST generate all necessary files, including \`package.json\` if there are dependencies, and pass them in the 'files' argument.
+Example \`package.json\`:
+\`\`\`json
+{
+  "name": "my-function",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": { "test": "echo \\"Error: no test specified\\" && exit 1" },
+  "dependencies": { "node-appwrite": "^12.0.1" }
+}
+\`\`\`
+Note the \`"type": "module"\` which is required for using ES module syntax (import/export).`;
 
 
     // Define base chat configuration
@@ -92,10 +128,11 @@ export const runAI = async (
         const fileDescriptions = files.map(file => `**${file.name}** (${file.type})`).join(', ');
         const fileDescription = `The user has attached ${files.length} file(s): ${fileDescriptions}.`;
         
-        let systemNote = `\n\n[System note: You have access to these files. To use them, call a tool like 'writeFile'. You do not need to ask for their content.`;
+        let systemNote = `\n\n[System note: You have access to these files. To deploy function code, use 'packageAndDeployFunction' with the names of the source files. To upload a pre-made .tar.gz archive, use 'createDeployment'. For other files, use 'writeFile'. You do not need to ask for their content.`;
+
         if (files.length > 1) {
              const fileNames = files.map(f => `"${f.name}"`).join(', ');
-             systemNote += ` When calling 'writeFile', you MUST specify the 'fileName' argument. To upload multiple files, you must make parallel tool calls, one for each file. Available files: ${fileNames}.`;
+             systemNote += ` When calling a file-based tool, you MUST specify the correct 'fileName' or 'fileNames' argument. Available files: ${fileNames}.`;
         }
         systemNote += `]`;
         
@@ -163,22 +200,48 @@ export const runAI = async (
                 };
             }
             
-            // Clone args and inject file if needed for the specific tool
+            // Clone args and inject file(s) if needed for specific tools
             const finalArgs = { ...toolCall.args };
-            if (toolName === 'writeFile') {
+            if (toolName === 'writeFile' || toolName === 'createDeployment') {
                 let fileToUpload: File | undefined = undefined;
                 const targetFileName = (finalArgs as any).fileName;
 
                 if (targetFileName) {
-                    // If fileName is provided, always use it to find the file.
                     fileToUpload = files.find(f => f.name === targetFileName);
                 } else if (files.length === 1) {
-                    // If no fileName, and only one file exists, use it as a fallback.
                     fileToUpload = files[0];
                 }
                 
-                (finalArgs as any).fileToUpload = fileToUpload;
+                if (toolName === 'writeFile') {
+                    (finalArgs as any).fileToUpload = fileToUpload;
+                } else if (toolName === 'createDeployment') {
+                    (finalArgs as any).codeFile = fileToUpload;
+                }
+            } else if (toolName === 'packageAndDeployFunction') {
+                const targetFileNames = (finalArgs as any).fileNames as string[] | undefined;
+                
+                if (!targetFileNames || targetFileNames.length === 0) {
+                    // If model doesn't specify filenames, but files are attached, assume all attached files.
+                    if (files.length > 0) {
+                        console.log('No fileNames provided, using all attached files for packaging.');
+                        (finalArgs as any).filesToPackage = files;
+                    }
+                } else {
+                    const filesToPackage = files.filter(f => targetFileNames.includes(f.name));
+                    if (filesToPackage.length !== targetFileNames.length) {
+                        const missing = targetFileNames.filter(name => !files.some(f => f.name === name));
+                        logCallback(`Error: packageAndDeployFunction missing files: ${missing.join(', ')}`);
+                        return {
+                            functionResponse: {
+                                name: toolCall.name,
+                                response: { error: `Could not find the following files attached to the message: ${missing.join(', ')}. Available files are: ${files.map(f=>f.name).join(', ')}` },
+                            },
+                        };
+                    }
+                    (finalArgs as any).filesToPackage = filesToPackage;
+                }
             }
+
 
             // Execute the tool
             logCallback(`Executing tool: ${toolName} with args: ${JSON.stringify(toolCall.args, null, 2)}`);
