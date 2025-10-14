@@ -1,3 +1,4 @@
+
 import type { Models } from 'appwrite';
 import type { FunctionCall, Part } from '@google/genai';
 
@@ -39,6 +40,7 @@ export interface AIContext {
     database?: Database | null;
     collection?: Collection | null;
     bucket?: Bucket | null;
+    fn?: AppwriteFunction | null;
 }
 
 export interface UserPrefs extends Models.Preferences {
@@ -85,4 +87,21 @@ export interface Bucket {
     compression: string;
     encryption: boolean;
     antivirus: boolean;
+}
+
+export interface AppwriteFunction {
+    $id: string;
+    $createdAt: string;
+    $updatedAt: string;
+    $permissions: string[];
+    name: string;
+    enabled: boolean;
+    runtime: string;
+    deployment: string;
+    vars: object[];
+    events: string[];
+    schedule: string;
+    timeout: number;
+    entrypoint: string;
+    commands: string;
 }

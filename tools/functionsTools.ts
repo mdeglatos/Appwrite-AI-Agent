@@ -1,7 +1,5 @@
-
-
 import { getSdkFunctions, ID, Query } from '../services/appwrite';
-import type { AIContext } from '../types';
+import type { AIContext, AppwriteProject } from '../types';
 import { Type, type FunctionDeclaration } from '@google/genai';
 import Tar from 'tar-js';
 import pako from 'pako';
@@ -44,6 +42,156 @@ async function createTarGzFromStringContent(files: { name: string; content: stri
     const tarUint8Array = tar.out;
     const gzippedData = pako.gzip(tarUint8Array);
     return new Blob([gzippedData], { type: 'application/gzip' });
+}
+
+// New helper for deploying from string content, used by both manual deploy and AI tool
+export async function deployCodeFromString(
+    project: AppwriteProject,
+    functionId: string,
+    files: { name: string; content: string }[],
+    activate: boolean,
+    entrypoint?: string,
+    commands?: string
+) {
+    if (!files || files.length === 0) {
+        throw new Error('No source files were provided to package.');
+    }
+
+    const codeBlob = await createTarGzFromStringContent(files);
+    const codeFile = new File([codeBlob], 'code.tar.gz', { type: 'application/gzip' });
+
+    const formData = new FormData();
+    formData.append('code', codeFile);
+    formData.append('activate', String(activate));
+    if (entrypoint) formData.append('entrypoint', entrypoint);
+    if (commands) formData.append('commands', commands);
+
+    const response = await fetch(`${project.endpoint}/functions/${functionId}/deployments`, {
+        method: 'POST',
+        headers: {
+            'X-Appwrite-Project': project.projectId,
+            'X-Appwrite-Key': project.apiKey,
+        },
+        body: formData,
+    });
+
+    const jsonResponse = await response.json();
+
+    if (!response.ok) {
+        throw new Error(jsonResponse.message || `Deployment creation failed with status ${response.status}`);
+    }
+
+    return jsonResponse;
+}
+
+
+// New exported helper to download and unpack deployment code
+export interface UnpackedFile {
+    name: string;
+    content: string;
+    size: number;
+}
+
+// FIX: The original code was using 'tar-js' to extract tar files, which is not a supported feature of the library.
+// The following helper functions implement a simple TAR extractor to correctly parse the deployment data
+// without adding new dependencies.
+
+// Helper to decode a string from a Uint8Array, stopping at the first null character.
+function decodeString(buffer: Uint8Array): string {
+    let result = '';
+    for (let i = 0; i < buffer.length; i++) {
+        if (buffer[i] === 0) break;
+        result += String.fromCharCode(buffer[i]);
+    }
+    return result;
+}
+
+// Helper to parse octal number from a Uint8Array.
+function parseOctal(buffer: Uint8Array): number {
+    const str = decodeString(buffer).trim();
+    if (!str) return 0;
+    return parseInt(str, 8);
+}
+
+// A simple TAR extractor.
+function untar(arrayBuffer: ArrayBuffer): UnpackedFile[] {
+    const tarData = new Uint8Array(arrayBuffer);
+    const files: UnpackedFile[] = [];
+    let offset = 0;
+
+    while (offset < tarData.length) {
+        const header = tarData.subarray(offset, offset + 512);
+
+        // Check for end-of-archive marker (two consecutive null blocks)
+        if (header.every(b => b === 0)) {
+            break;
+        }
+
+        const fileName = decodeString(header.subarray(0, 100));
+        const fileSize = parseOctal(header.subarray(124, 136));
+        const typeflag = String.fromCharCode(header[156]);
+
+        offset += 512;
+
+        if ((typeflag === '0' || typeflag === '' || typeflag === '\0') && fileName) { // It's a file with a name
+            const fileContentBuffer = tarData.subarray(offset, offset + fileSize);
+            const content = new TextDecoder('utf-8').decode(fileContentBuffer);
+            files.push({
+                name: fileName,
+                content: content,
+                size: fileSize,
+            });
+        }
+        
+        // Move offset to the next header, aligned to 512 bytes
+        if (fileSize > 0) {
+            offset += Math.ceil(fileSize / 512) * 512;
+        }
+
+        // Safety break
+        if (offset > tarData.length || isNaN(fileSize)) {
+            console.error("Error parsing TAR file. Aborting.");
+            break;
+        }
+    }
+    return files;
+}
+
+export async function downloadAndUnpackDeployment(
+    project: AppwriteProject,
+    functionId: string,
+    deploymentId: string | null
+): Promise<UnpackedFile[] | null> {
+    if (!deploymentId) {
+        console.warn(`Function ${functionId} has no active deployment.`);
+        return null;
+    }
+
+    try {
+        const functions = getSdkFunctions(project);
+        const deploymentData: ArrayBuffer = await functions.getDeploymentDownload(functionId, deploymentId);
+        
+        if (!deploymentData || deploymentData.byteLength === 0) {
+            console.warn(`Downloaded deployment for ${functionId} is empty.`);
+            return null;
+        }
+
+        const gzippedData = new Uint8Array(deploymentData);
+        const tarData = pako.ungzip(gzippedData);
+
+        // FIX: The original code incorrectly used 'tar-js' for extraction, which it does not support.
+        // Replaced with a simple, self-contained TAR parser. This resolves errors on lines 76, 80, and 89.
+        const files = untar(tarData.buffer);
+
+        return files;
+    } catch (error) {
+        console.error(`Failed to download or unpack deployment ${deploymentId} for function ${functionId}:`, error);
+        if (error instanceof Error && (error.message.includes('not_found') || (error as any).code === 404)) {
+             console.warn(`Deployment ${deploymentId} not found.`);
+             return null;
+        }
+        throw error;
+    }
 }
 
 
@@ -200,6 +348,28 @@ async function listRuntimes(context: AIContext) {
 // =================================================================
 // Deployment Management
 // =================================================================
+async function getFunctionDeploymentCode(context: AIContext, { functionId, deploymentId }: { functionId: string, deploymentId?: string }) {
+    try {
+        let finalDeploymentId = deploymentId;
+        if (!finalDeploymentId) {
+            // If no deploymentId is provided, get the function to find its active deployment.
+            const functions = getSdkFunctions(context.project);
+            const func = await functions.get(functionId);
+            finalDeploymentId = func.deployment;
+        }
+
+        const files = await downloadAndUnpackDeployment(context.project, functionId, finalDeploymentId);
+        
+        if (!files) {
+            return { result: "No files found in the deployment or the deployment does not exist." };
+        }
+
+        return { files: files.map(f => ({ name: f.name, size: f.size, content: f.content })) };
+    } catch (error) {
+        return handleApiError(error);
+    }
+}
+
 async function createAndDeployFunction(context: AIContext, { functionId, activate, entrypoint, commands, files }: { 
     functionId: string, 
     activate: boolean, 
@@ -207,46 +377,12 @@ async function createAndDeployFunction(context: AIContext, { functionId, activat
     commands?: string,
     files: { name: string, content: string }[],
 }) {
-    console.log(`Executing createAndDeployFunction for function '${functionId}'`);
-    
-    if (!files || files.length === 0) {
-        return { error: 'No source files were provided to package. The model must provide file content.' };
-    }
-    console.log(`Packaging in-memory files: ${files.map(f => f.name).join(', ')}`);
-
+    console.log(`Executing createAndDeployFunction tool for function '${functionId}'`);
     try {
-        const codeBlob = await createTarGzFromStringContent(files);
-        const codeFile = new File([codeBlob], 'code.tar.gz', { type: 'application/gzip' });
-
-        const formData = new FormData();
-        formData.append('code', codeFile);
-        formData.append('activate', String(activate));
-        if (entrypoint) {
-            formData.append('entrypoint', entrypoint);
-        }
-        if (commands) {
-            formData.append('commands', commands);
-        }
-
-        console.log(`Uploading generated code to function '${functionId}'...`);
-
-        const response = await fetch(`${context.project.endpoint}/functions/${functionId}/deployments`, {
-            method: 'POST',
-            headers: {
-                'X-Appwrite-Project': context.project.projectId,
-                'X-Appwrite-Key': context.project.apiKey,
-            },
-            body: formData,
-        });
-
-        const jsonResponse = await response.json();
-
-        if (!response.ok) {
-            throw new Error(jsonResponse.message || `Deployment creation failed with status ${response.status}`);
-        }
-
-        console.log('Deployment successful:', jsonResponse);
-        return jsonResponse;
+        console.log(`Packaging in-memory files: ${files.map(f => f.name).join(', ')}`);
+        const result = await deployCodeFromString(context.project, functionId, files, activate, entrypoint, commands);
+        console.log('Deployment successful:', result);
+        return result;
     } catch (error) {
         return handleApiError(error);
     }
@@ -488,6 +624,7 @@ export const functionsFunctions = {
     updateFunctionDeployment,
     deleteFunction,
     listRuntimes,
+    getFunctionDeploymentCode,
     createAndDeployFunction,
     packageAndDeployFunction,
     createDeployment,
@@ -607,6 +744,18 @@ export const functionsToolDefinitions: FunctionDeclaration[] = [
         name: 'listRuntimes',
         description: 'Get a list of all runtimes that are currently active.',
         parameters: { type: Type.OBJECT, properties: {}, required: [] },
+    },
+     {
+        name: 'getFunctionDeploymentCode',
+        description: 'Downloads and unpacks the code for a function deployment, returning the file names and their contents. If deploymentId is omitted, it fetches the code for the currently active deployment.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                functionId: { type: Type.STRING, description: 'The ID of the function.' },
+                deploymentId: { type: Type.STRING, description: 'Optional. The ID of the deployment to download. Defaults to the active deployment.' },
+            },
+            required: ['functionId'],
+        }
     },
     {
         name: 'createAndDeployFunction',

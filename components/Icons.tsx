@@ -3,7 +3,7 @@ import React from 'react';
 import { IoSend, IoAttach } from 'react-icons/io5';
 import { CgSpinner } from 'react-icons/cg';
 import { FaUser } from 'react-icons/fa';
-import { RiRobot2Line, RiSettings3Line, RiAddCircleLine, RiDeleteBinLine, RiCheckLine, RiCloseLine, RiTerminalBoxLine, RiMenuLine, RiToolsLine, RiLogoutBoxRLine, RiArrowDownSLine, RiArrowUpSLine, RiStackLine, RiFileUploadFill, RiFile3Line, RiKey2Line, RiRefreshLine } from 'react-icons/ri';
+import { RiRobot2Line, RiSettings3Line, RiAddCircleLine, RiDeleteBinLine, RiCheckLine, RiCloseLine, RiTerminalBoxLine, RiMenuLine, RiToolsLine, RiLogoutBoxRLine, RiArrowDownSLine, RiArrowUpSLine, RiStackLine, RiFileUploadFill, RiFile3Line, RiKey2Line, RiRefreshLine, RiFileCopyLine, RiCodeSSlashLine } from 'react-icons/ri';
 
 export const SendIcon: React.FC = () => <IoSend size={20} />;
 export const AttachmentIcon: React.FC<{ size?: number }> = ({ size = 20 }) => <IoAttach size={size} />;
@@ -35,3 +35,5 @@ export const FileIcon: React.FC<{ size?: number }> = ({ size = 32 }) => <RiFile3
 export const KeyIcon: React.FC = () => <RiKey2Line size={20} />;
 
 export const RefreshIcon: React.FC<{ size?: number }> = ({ size = 18 }) => <RiRefreshLine size={size} />;
+export const CopyIcon: React.FC<{ size?: number }> = ({ size = 16 }) => <RiFileCopyLine size={size} />;
+export const CodeIcon: React.FC = () => <RiCodeSSlashLine size={20} />;

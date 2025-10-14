@@ -1,18 +1,20 @@
-
 import React from 'react';
-import type { Database, Collection, Bucket } from '../types';
+import type { Database, Collection, Bucket, AppwriteFunction } from '../types';
 import { LoadingSpinnerIcon, RefreshIcon } from './Icons';
 
 interface ProjectContextSelectorProps {
     databases: Database[];
     collections: Collection[];
     buckets: Bucket[];
+    functions: AppwriteFunction[];
     selectedDatabase: Database | null;
     selectedCollection: Collection | null;
     selectedBucket: Bucket | null;
+    selectedFunction: AppwriteFunction | null;
     onDatabaseSelect: (db: Database | null) => void;
     onCollectionSelect: (collection: Collection | null) => void;
     onBucketSelect: (bucket: Bucket | null) => void;
+    onFunctionSelect: (fn: AppwriteFunction | null) => void;
     isLoading: boolean;
     onRefresh: () => void;
 }
@@ -54,12 +56,15 @@ export const ProjectContextSelector: React.FC<ProjectContextSelectorProps> = ({
     databases,
     collections,
     buckets,
+    functions,
     selectedDatabase,
     selectedCollection,
     selectedBucket,
+    selectedFunction,
     onDatabaseSelect,
     onCollectionSelect,
     onBucketSelect,
+    onFunctionSelect,
     isLoading,
     onRefresh,
 }) => {
@@ -82,8 +87,14 @@ export const ProjectContextSelector: React.FC<ProjectContextSelectorProps> = ({
         onBucketSelect(bucket);
     };
 
+    const handleFunctionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const funcId = e.target.value;
+        const func = functions.find(f => f.$id === funcId) || null;
+        onFunctionSelect(func);
+    };
+
     return (
-        <div className="flex items-center gap-2 md:gap-4 flex-wrap max-w-5xl mx-auto px-2">
+        <div className="flex items-center gap-2 md:gap-4 flex-wrap max-w-6xl mx-auto px-2">
             <div className="flex items-center gap-2 text-sm font-semibold text-gray-400 flex-shrink-0">
                 <span>Context:</span>
                 <button
@@ -124,6 +135,16 @@ export const ProjectContextSelector: React.FC<ProjectContextSelectorProps> = ({
                 onChange={handleBucketChange}
                 options={buckets}
                 placeholder="Select a Bucket..."
+                disabled={isLoading}
+            />
+
+            <Selector
+                label="function-selector"
+                aria-label="Select Function"
+                value={selectedFunction?.$id || ''}
+                onChange={handleFunctionChange}
+                options={functions}
+                placeholder="Select a Function..."
                 disabled={isLoading}
             />
         </div>

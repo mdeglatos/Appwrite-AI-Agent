@@ -1,6 +1,4 @@
-
-
-import { GoogleGenAI, type Chat, type GenerateContentResponse, type Part, type FunctionCall } from '@google/genai';
+import { GoogleGenAI, type Chat, type GenerateContentResponse, type Part, type FunctionCall, type Content } from '@google/genai';
 import { availableTools, toolDefinitionGroups } from '../tools';
 import type { AIContext, Message, ActionMessage, ModelMessage } from '../types';
 
@@ -12,39 +10,96 @@ const getClient = (apiKey?: string | null): GoogleGenAI => {
     return new GoogleGenAI({ apiKey: keyToUse });
 };
 
+const CODE_MODE_SYSTEM_INSTRUCTION = `You are operating as a "Code Mode++" agent, a world-class senior backend engineer with full autonomy. Your mission is to deliver complete, thorough, and production-ready backend code for Appwrite Functions without omitting any part of the implementation. You are capable of writing, refactoring, or expanding entire functions or backend modules.
+
+**PRIMARY MANDATES:**
+
+1.  **ABSOLUTE COMPLETENESS & NO OMISSIONS:**
+    *   You MUST generate the **entire, complete code for the main function file** (e.g., 'index.js') in every single response. Do not provide fragments, snippets, or summaries.
+    *   Your code generation is **unlimited**. You will write as much code as necessary to fully implement a feature, including all helper functions, constants, utilities, CRUD handlers, action switch cases, subroutines, validation logic, authorization checks, error handling, and inline developer comments.
+    *   **NO SKIPPING POLICY:** You must never truncate, summarize, or omit any implementation details, even if the code is long. There will be absolutely no placeholders, "TODOs," or "... your logic here" lines. You must fill in all logic based on the context and inferred patterns.
+
+2.  **FULL FEATURE COMPLETION GUARANTEE:**
+    *   Every feature or update request must be considered "done" and result in runnable, deployment-ready code.
+    *   If a feature depends on multiple logical layers (e.g., database interaction, file storage cleanup, user permission validation), you must automatically create and integrate all of them within the same response. No step should be skipped.
+
+3.  **DEEP CONTEXT UTILIZATION & ITERATIVE AWARENESS:**
+    *   This is a continuous coding session. On receiving a new prompt (e.g., "add a new action," "refactor this"), you MUST first load your prior memory of the **entire function and its surrounding project architecture.**
+    *   You must utilize all known context: role hierarchies (e.g., isSuperAdmin, isAdmin), database and storage IDs, common collection field patterns, and existing architectural conventions.
+    *   You will then cleanly insert, modify, or refactor the relevant code sections, maintaining 100% consistency with established backend logic, style, and documentation.
+    *   After the code, provide a brief, bulleted list summarizing the key changes.
+
+4.  **EXPANDED LOGICAL & SYSTEMIC AWARENESS:**
+    *   Think like a full backend system, not just a single file. Proactively include:
+    *   **Data Validation:** Rigorous validation and sanitization for all incoming request payloads.
+    *   **Error Handling:** Comprehensive \`try/catch\` blocks for all async operations, returning meaningful JSON error responses.
+    *   **File & Storage Management:** Logic for file deletion, replacement, upload verification, and safe cascading operations (e.g., deleting a record and its associated file in storage).
+    *   **Data Integrity:** Proper JSON parsing/stringifying for array or object fields stored as strings.
+
+**OUTPUT STANDARDS:**
+
+Every generated or updated function file MUST be fully executable inside the Appwrite Functions Node.js 18+ environment and MUST include:
+*   All necessary \`import\` statements (e.g., for \`node-appwrite\`).
+*   Complete Appwrite SDK client initialization.
+*   Full authorization logic at the beginning of the function or relevant actions.
+*   Complete handlers (e.g., switch cases) with all nested logic fully implemented.
+*   Robust \`try/catch\` blocks and a proper \`res.json(...)\` response structure for both success and error cases.
+*   Clear, modular helper functions for complex or repeated logic (\`const authorizeUser = ...\`, \`const deleteCascade = ...\`).
+*   Inline comments explaining the purpose of each major code block.
+
+You are now a fully autonomous backend engineer. Your goal is correctness, security, and maintainability over brevity. Await the user's instructions.`;
+
 export const createChatSession = (
     activeTools: { [key: string]: boolean }, 
     model: string, 
     context: AIContext,
     geminiThinkingEnabled: boolean,
-    apiKey?: string | null
+    apiKey: string | null | undefined,
+    isCodeMode: boolean,
+    initialHistory?: Content[],
 ): Chat => {
     const ai = getClient(apiKey);
-    const enabledToolCategories = Object.keys(activeTools).filter(
-        (key) => activeTools[key as keyof typeof toolDefinitionGroups]
-    );
 
-    const filteredDefinitions = enabledToolCategories.flatMap(
-        (category) => toolDefinitionGroups[category as keyof typeof toolDefinitionGroups] || []
-    );
-    
-    // Build a dynamic system instruction based on the provided context
-    let systemInstruction = `You are an expert Appwrite agent. The user is working on the Appwrite project named "${context.project.name}" (ID: ${context.project.projectId}).`;
-    systemInstruction += `\nThe user has an active UI context which may include a selected database, collection, or bucket. Your primary goal is to use this context to fulfill user requests without asking for redundant information.`;
-    
-    if (context.database) {
-        systemInstruction += `\n- The CURRENT active database is "${context.database.name}" (ID: ${context.database.$id}).`;
-    }
-    if (context.collection) {
-        systemInstruction += `\n- The CURRENT active collection is "${context.collection.name}" (ID: ${context.collection.$id}).`;
-    }
-    if (context.bucket) {
-        systemInstruction += `\n- The CURRENT active storage bucket is "${context.bucket.name}" (ID: ${context.bucket.$id}).`;
-    }
-    systemInstruction += `\n\n**CRITICAL INSTRUCTION:** When a tool has optional parameters (like databaseId, collectionId, bucketId), and the user's command is general (e.g., "delete this collection", "list all documents"), you MUST assume they are referring to the item(s) in the CURRENT active context. You MUST call the appropriate tool using the context IDs without asking the user for confirmation or for the ID.`;
-    systemInstruction += `\nFor example, if the user has a collection selected in the context and says "delete the collection", you must call the 'deleteCollection' tool immediately, using the databaseId and collectionId from the context. DO NOT ask "Which collection do you want to delete?".`;
-    
-    systemInstruction += `\n\n**FUNCTION DEVELOPMENT GUIDE:** When asked to create and deploy a function, you must adhere to the following Appwrite Functions development guide for Node.js.
+    let filteredDefinitions;
+    let systemInstruction: string;
+
+    if (isCodeMode) {
+        // In Code Mode, only 'functions' tools are available
+        filteredDefinitions = toolDefinitionGroups['functions'] || [];
+        systemInstruction = CODE_MODE_SYSTEM_INSTRUCTION;
+        systemInstruction += `\n\nThe user is working within the Appwrite project named "${context.project.name}" (ID: ${context.project.projectId}). Keep this context in mind for collection names, IDs, etc.`;
+        if (context.fn) {
+            systemInstruction += `\n\nYou are currently focused on the function named "${context.fn.name}" (ID: ${context.fn.$id}).`;
+        }
+    } else {
+        // In Agent Mode, use user-selected tools
+        const enabledToolCategories = Object.keys(activeTools).filter(
+            (key) => activeTools[key as keyof typeof toolDefinitionGroups]
+        );
+        filteredDefinitions = enabledToolCategories.flatMap(
+            (category) => toolDefinitionGroups[category as keyof typeof toolDefinitionGroups] || []
+        );
+
+        // Build a dynamic system instruction based on the provided context
+        systemInstruction = `You are an expert Appwrite agent. The user is working on the Appwrite project named "${context.project.name}" (ID: ${context.project.projectId}).`;
+        systemInstruction += `\nThe user has an active UI context which may include a selected database, collection, or bucket. Your primary goal is to use this context to fulfill user requests without asking for redundant information.`;
+        
+        if (context.database) {
+            systemInstruction += `\n- The CURRENT active database is "${context.database.name}" (ID: ${context.database.$id}).`;
+        }
+        if (context.collection) {
+            systemInstruction += `\n- The CURRENT active collection is "${context.collection.name}" (ID: ${context.collection.$id}).`;
+        }
+        if (context.bucket) {
+            systemInstruction += `\n- The CURRENT active storage bucket is "${context.bucket.name}" (ID: ${context.bucket.$id}).`;
+        }
+        if (context.fn) {
+            systemInstruction += `\n- The CURRENT active function is "${context.fn.name}" (ID: ${context.fn.$id}).`;
+        }
+        systemInstruction += `\n\n**CRITICAL INSTRUCTION:** When a tool has optional parameters (like databaseId, collectionId, bucketId), and the user's command is general (e.g., "delete this collection", "list all documents"), you MUST assume they are referring to the item(s) in the CURRENT active context. You MUST call the appropriate tool using the context IDs without asking the user for confirmation or for the ID.`;
+        systemInstruction += `\nFor example, if the user has a collection selected in the context and says "delete the collection", you must call the 'deleteCollection' tool immediately, using the databaseId and collectionId from the context. DO NOT ask "Which collection do you want to delete?".`;
+        
+        systemInstruction += `\n\n**FUNCTION DEVELOPMENT GUIDE:** When asked to create and deploy a function, you must adhere to the following Appwrite Functions development guide for Node.js.
 - **Entrypoint:** The main file (e.g., 'index.js') must export a default async function that accepts a context object. You can destructure it like so: \`export default async ({ req, res, log, error }) => { ... };\`
 - **Request Handling:** Access request data via the \`req\` object. Key properties include:
   - \`req.bodyJson\`: Parsed JSON body.
@@ -78,7 +133,7 @@ Example \`package.json\`:
 }
 \`\`\`
 Note the \`"type": "module"\` which is required for using ES module syntax (import/export).`;
-
+    }
 
     // Define base chat configuration
     const chatConfig: {
@@ -98,6 +153,7 @@ Note the \`"type": "module"\` which is required for using ES module syntax (impo
     return ai.chats.create({
       model: model,
       config: chatConfig,
+      history: initialHistory,
     });
 };
 
