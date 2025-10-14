@@ -488,6 +488,21 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
       }
   }, [refreshUser, logCallback]);
 
+  const handleCodeGenerated = useCallback((newFiles: { name: string; content: string }[]) => {
+      logCallback("Code Mode: AI has generated new code. The editor panel has been updated.");
+      
+      const unpackedNewFiles: UnpackedFile[] = newFiles.map(file => ({
+          name: file.name,
+          content: file.content,
+          size: new Blob([file.content]).size, 
+      }));
+
+      // The AI-generated code is the new "source of truth".
+      // Update both the editable copy and the original copy to reflect this.
+      // This also resets the "hasUnsavedChanges" state.
+      setEditedFunctionFiles(unpackedNewFiles);
+      setFunctionFiles(unpackedNewFiles);
+  }, [logCallback]);
 
   const handleSendMessage = async (input: string) => {
     const hasText = input.trim().length > 0;
@@ -531,7 +546,15 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
           bucket: selectedBucket,
           fn: selectedFunction,
       };
-      await runAI(chat, input, context, logCallback, updateChatCallback, userMessage.files);
+      await runAI(
+          chat, 
+          input, 
+          context, 
+          logCallback, 
+          updateChatCallback, 
+          userMessage.files,
+          isCodeModeActive ? handleCodeGenerated : undefined
+      );
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
       setError(errorMessage);

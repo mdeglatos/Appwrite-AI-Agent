@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, type Chat, type GenerateContentResponse, type Part, type FunctionCall, type Content } from '@google/genai';
 import { availableTools, toolDefinitionGroups } from '../tools';
 import type { AIContext, Message, ActionMessage, ModelMessage } from '../types';
@@ -164,7 +165,8 @@ export const runAI = async (
     context: AIContext,
     logCallback: (log: string) => void,
     updateChat: (message: Message) => void,
-    files: File[] = []
+    files: File[] = [],
+    onCodeGenerated?: (files: { name: string; content: string }[]) => void
 ): Promise<void> => {
     logCallback(`Starting AI run with prompt: "${prompt}"`);
     if (files.length > 0) {
@@ -245,6 +247,14 @@ export const runAI = async (
         const toolCallPromises = functionCalls.map(async (toolCall) => {
             const toolName = toolCall.name as keyof typeof availableTools;
             const toolToCall = availableTools[toolName];
+
+            // If the AI is generating code, send it back to the UI to update the editor.
+            if (toolName === 'createAndDeployFunction' && onCodeGenerated) {
+                const codeFiles = (toolCall.args as any).files;
+                if (codeFiles && Array.isArray(codeFiles)) {
+                    onCodeGenerated(codeFiles);
+                }
+            }
 
             if (!toolToCall) {
                 logCallback(`Error: Unknown tool referenced by the model: ${toolCall.name}`);
