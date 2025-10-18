@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, type Chat, type GenerateContentResponse, type Part, type FunctionCall, type Content } from '@google/genai';
 import { availableTools, toolDefinitionGroups } from '../tools';
-import type { AIContext, Message, ActionMessage, ModelMessage } from '../types';
+import type { AIContext, Message, ActionMessage, ModelMessage, GroundingChunk } from '../types';
 
 const getClient = (apiKey?: string | null): GoogleGenAI => {
     const keyToUse = apiKey || process.env.API_KEY;
@@ -61,12 +61,28 @@ export const createChatSession = (
 ): Chat => {
     const ai = getClient(apiKey);
 
-    let filteredDefinitions;
     let systemInstruction: string;
+    let finalTools: any[] | undefined = undefined;
 
-    if (isCodeMode) {
+    if (activeTools['search']) {
+        console.log('Google Search is enabled. Using grounding tool.');
+        finalTools = [{ googleSearch: {} }];
+        
+        systemInstruction = `You are an expert Appwrite agent with Google Search capabilities. The user is working on the Appwrite project named "${context.project.name}" (ID: ${context.project.projectId}). Use your search tool to find up-to-date information, documentation, or solutions to errors when necessary.`;
+        
+        if (isCodeMode) {
+             systemInstruction += ` You are currently in "Code Mode". Your primary goal is to provide complete, production-ready code based on the user's request and information gathered from search. When fixing errors, analyze the error message and use search to find the most recent documentation or community solutions. Provide the corrected, complete code block in your response.`;
+             if (context.fn) {
+                systemInstruction += `\n\nYou are currently focused on the function named "${context.fn.name}" (ID: ${context.fn.$id}).`;
+            }
+        }
+
+    } else if (isCodeMode) {
         // In Code Mode, only 'functions' tools are available
-        filteredDefinitions = toolDefinitionGroups['functions'] || [];
+        const filteredDefinitions = toolDefinitionGroups['functions'] || [];
+        if (filteredDefinitions.length > 0) {
+            finalTools = [{ functionDeclarations: filteredDefinitions }];
+        }
         systemInstruction = CODE_MODE_SYSTEM_INSTRUCTION;
         systemInstruction += `\n\nThe user is working within the Appwrite project named "${context.project.name}" (ID: ${context.project.projectId}). Keep this context in mind for collection names, IDs, etc.`;
         if (context.fn) {
@@ -75,11 +91,15 @@ export const createChatSession = (
     } else {
         // In Agent Mode, use user-selected tools
         const enabledToolCategories = Object.keys(activeTools).filter(
-            (key) => activeTools[key as keyof typeof toolDefinitionGroups]
+            (key) => activeTools[key as keyof typeof toolDefinitionGroups] && key !== 'search'
         );
-        filteredDefinitions = enabledToolCategories.flatMap(
+        const filteredDefinitions = enabledToolCategories.flatMap(
             (category) => toolDefinitionGroups[category as keyof typeof toolDefinitionGroups] || []
         );
+
+        if (filteredDefinitions.length > 0) {
+            finalTools = [{ functionDeclarations: filteredDefinitions }];
+        }
 
         // Build a dynamic system instruction based on the provided context
         systemInstruction = `You are an expert Appwrite agent. The user is working on the Appwrite project named "${context.project.name}" (ID: ${context.project.projectId}).`;
@@ -143,7 +163,7 @@ Note the \`"type": "module"\` which is required for using ES module syntax (impo
         thinkingConfig?: { thinkingBudget: number };
     } = {
         systemInstruction: systemInstruction,
-        tools: filteredDefinitions.length > 0 ? [{ functionDeclarations: filteredDefinitions }] : undefined,
+        tools: finalTools,
     };
 
     // Disable thinking if the model is flash and the user has opted out
@@ -211,6 +231,7 @@ export const runAI = async (
     while (true) {
         const text = result.text;
         const functionCalls = result.functionCalls;
+        const groundingChunks = result.candidates?.[0]?.groundingMetadata?.groundingChunks;
 
         // 2a. If the model returns text, display it. This can happen with or without a tool call.
         if (text) {
@@ -219,6 +240,7 @@ export const runAI = async (
                 id: crypto.randomUUID(),
                 role: 'model',
                 content: text,
+                groundingChunks: groundingChunks as GroundingChunk[] | undefined,
             };
             updateChat(modelMessage);
         }

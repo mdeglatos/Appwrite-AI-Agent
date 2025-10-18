@@ -15,11 +15,11 @@ import { getAccount, logout, updateGeminiPrefs } from './services/authService';
 import * as projectService from './services/projectService';
 import LoginPage from './components/LoginPage';
 import { getSdkDatabases, getSdkStorage, getSdkFunctions, Query } from './services/appwrite';
-import { downloadAndUnpackDeployment, type UnpackedFile } from './tools/functionsTools';
+import { downloadAndUnpackDeployment, type UnpackedFile, deployCodeFromString } from './tools/functionsTools';
 import { CodeViewerSidebar } from './components/CodeViewerSidebar';
 
 // Define tool categories as a top-level constant
-const toolCategories = ['database', 'storage', 'functions', 'users', 'teams'];
+const toolCategories = ['database', 'storage', 'functions', 'users', 'teams', 'search'];
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'];
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 
@@ -621,30 +621,68 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
     };
 
     const handleDeployChanges = async () => {
-        if (!selectedFunction || !editedFunctionFiles) {
-            setError("Cannot deploy: Missing function or code context.");
+        if (!activeProject || !selectedFunction || !editedFunctionFiles) {
+            const errorMsg = "Cannot deploy: Missing project, function, or code context.";
+            setError(errorMsg);
+            logCallback(`ERROR: ${errorMsg}`);
             return;
         }
 
         setIsDeploying(true);
         setError(null);
-        logCallback(`Manual Deploy: Triggering AI to deploy changes for function "${selectedFunction.name}"...`);
+        logCallback(`Manual Deploy: Starting deployment for function "${selectedFunction.name}"...`);
 
-        const fileParts = editedFunctionFiles.map(file => `File: \`${file.name}\`\n\`\`\`\n${file.content}\n\`\`\``).join('\n\n');
-        
-        const deployPrompt = `CRITICAL: The user has manually edited the code for the function named "${selectedFunction.name}". Your task is to deploy these changes. You MUST call the 'createAndDeployFunction' tool.
+        try {
+            let entrypoint = selectedFunction.entrypoint; // Default to existing
+            let commands = selectedFunction.commands;   // Default to existing
 
-1.  Analyze the provided files, especially \`package.json\`, to determine the correct build \`commands\` (e.g., "npm install") and the correct \`entrypoint\` file.
-2.  Set \`activate\` to \`true\`.
-3.  Provide the user's updated code in the 'files' argument of the tool call.
+            const packageJsonFile = editedFunctionFiles.find(f => f.name === 'package.json');
+            if (packageJsonFile) {
+                logCallback('Found package.json, parsing for deployment config...');
+                try {
+                    const packageJson = JSON.parse(packageJsonFile.content);
+                    if (packageJson.main) {
+                        entrypoint = packageJson.main;
+                        logCallback(`Found entrypoint in package.json: "${entrypoint}"`);
+                    }
+                    // Appwrite's standard build command for Node.js functions is 'npm install'.
+                    commands = "npm install"; 
+                    logCallback(`Setting build commands to: "${commands}"`);
+                } catch (e) {
+                    const parseError = `Failed to parse package.json: ${e instanceof Error ? e.message : 'Unknown error'}. Using existing deployment settings.`;
+                    setError(parseError);
+                    logCallback(`ERROR: ${parseError}`);
+                }
+            }
+            
+            const deployment = await deployCodeFromString(
+                activeProject,
+                selectedFunction.$id,
+                editedFunctionFiles,
+                true, // activate
+                entrypoint,
+                commands
+            );
 
-Here is the updated code:
-${fileParts}`;
+            logCallback(`Deployment successfully created with ID: ${deployment.$id}. Build is in progress...`);
+            
+            // After successful deploy, the edited code becomes the new "original"
+            setFunctionFiles(JSON.parse(JSON.stringify(editedFunctionFiles)));
 
-        await handleSendMessage(deployPrompt);
-        
-        setIsDeploying(false);
-        logCallback(`Manual Deploy: AI deployment process has been initiated. Check the logs and AI response for status.`);
+            const successMessage: ModelMessage = {
+                id: crypto.randomUUID(),
+                role: 'model',
+                content: `✅ Deployment for function **${selectedFunction.name}** has been successfully initiated. The build process is now running in the background. You can check the function's deployment status in your Appwrite console.`
+            };
+            setMessages(prev => [...prev, successMessage]);
+
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred during deployment.';
+            setError(errorMessage);
+            logCallback(`ERROR deploying function: ${errorMessage}`);
+        } finally {
+            setIsDeploying(false);
+        }
     };
 
   const handleFileSelect = (files: File[] | null) => {

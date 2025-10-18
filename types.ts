@@ -12,10 +12,21 @@ export interface UserMessage {
   files?: File[];
 }
 
+export interface GroundingChunkWeb {
+  uri: string;
+  title: string;
+}
+
+export interface GroundingChunk {
+  web?: GroundingChunkWeb;
+  // In the future, could also include 'maps' if that grounding is added.
+}
+
 export interface ModelMessage {
   id:string;
   role: 'model';
   content: string;
+  groundingChunks?: GroundingChunk[];
 }
 
 export interface ActionMessage {
