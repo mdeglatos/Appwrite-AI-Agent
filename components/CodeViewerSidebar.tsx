@@ -31,7 +31,7 @@ export const CodeViewerSidebar: React.FC<CodeViewerSidebarProps> = ({
     // Reset to first file when the function context changes (i.e., new files are loaded)
     useEffect(() => {
         setActiveFileIndex(0);
-    }, [files]);
+    }, [functionName]);
     
     useEffect(() => {
         if (isOpen) {
