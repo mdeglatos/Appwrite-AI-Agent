@@ -31,27 +31,8 @@ export async function logout() {
     }
 }
 
-export async function updateGeminiPrefs(prefs: { apiKey?: string | null; model?: string | null; thinking?: boolean | null }): Promise<void> {
+export async function updateUserPrefs(prefsToUpdate: Partial<UserPrefs>): Promise<void> {
     const user = await account.get<UserPrefs>();
     const currentPrefs = user.prefs || {};
-    
-    const newPrefs = { ...currentPrefs };
-
-    if (prefs.apiKey !== undefined) {
-        newPrefs.geminiApiKey = prefs.apiKey;
-    }
-    if (prefs.model !== undefined) {
-        newPrefs.geminiModel = prefs.model;
-    }
-    if (prefs.thinking !== undefined) {
-        newPrefs.geminiThinking = prefs.thinking;
-    }
-
-    await account.updatePrefs(newPrefs);
-}
-
-export async function updateToolsPrefs(tools: { [key: string]: boolean }): Promise<void> {
-    const user = await account.get<UserPrefs>();
-    const currentPrefs = user.prefs || {};
-    await account.updatePrefs({ ...currentPrefs, activeTools: tools });
+    await account.updatePrefs({ ...currentPrefs, ...prefsToUpdate });
 }

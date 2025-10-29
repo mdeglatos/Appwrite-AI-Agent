@@ -90,11 +90,9 @@ export const createChatSession = (
         }
     } else {
         // In Agent Mode, use user-selected tools
-        const enabledToolCategories = Object.keys(activeTools).filter(
-            (key) => activeTools[key as keyof typeof toolDefinitionGroups] && key !== 'search'
-        );
-        const filteredDefinitions = enabledToolCategories.flatMap(
-            (category) => toolDefinitionGroups[category as keyof typeof toolDefinitionGroups] || []
+        const allToolDefinitions = Object.values(toolDefinitionGroups).flat();
+        const filteredDefinitions = allToolDefinitions.filter(
+            toolDef => activeTools[toolDef.name]
         );
 
         if (filteredDefinitions.length > 0) {
@@ -140,7 +138,7 @@ export const createChatSession = (
 - **Dependencies:** If the function needs external packages (like 'node-appwrite'), you MUST include a 'package.json' file in the deployment package listing these dependencies.
 - **Code Structure:** For complex functions, you can create helper files and use ES module imports (e.g., \`import { helper } from './utils.js';\`). Ensure all necessary files are included in the deployment.
 
-When you use the \`createAndDeployFunction\` tool, you MUST generate all necessary files, including \`package.json\` if there are dependencies, and pass them in the 'files' argument.
+When you use the \`deployNewCodeToFunction\` tool, you MUST generate all necessary files, including \`package.json\` if there are dependencies, and pass them in the 'files' argument.
 Example \`package.json\`:
 \`\`\`json
 {
@@ -271,7 +269,7 @@ export const runAI = async (
             const toolToCall = availableTools[toolName];
 
             // If the AI is generating code, send it back to the UI to update the editor.
-            if (toolName === 'createAndDeployFunction' && onCodeGenerated) {
+            if (toolName === 'deployNewCodeToFunction' && onCodeGenerated) {
                 const codeFiles = (toolCall.args as any).files;
                 if (codeFiles && Array.isArray(codeFiles)) {
                     onCodeGenerated(codeFiles);
@@ -304,29 +302,6 @@ export const runAI = async (
                     (finalArgs as any).fileToUpload = fileToUpload;
                 } else if (toolName === 'createDeployment') {
                     (finalArgs as any).codeFile = fileToUpload;
-                }
-            } else if (toolName === 'packageAndDeployFunction') {
-                const targetFileNames = (finalArgs as any).fileNames as string[] | undefined;
-                
-                if (!targetFileNames || targetFileNames.length === 0) {
-                    // If model doesn't specify filenames, but files are attached, assume all attached files.
-                    if (files.length > 0) {
-                        console.log('No fileNames provided, using all attached files for packaging.');
-                        (finalArgs as any).filesToPackage = files;
-                    }
-                } else {
-                    const filesToPackage = files.filter(f => targetFileNames.includes(f.name));
-                    if (filesToPackage.length !== targetFileNames.length) {
-                        const missing = targetFileNames.filter(name => !files.some(f => f.name === name));
-                        logCallback(`Error: packageAndDeployFunction missing files: ${missing.join(', ')}`);
-                        return {
-                            functionResponse: {
-                                name: toolCall.name,
-                                response: { error: `Could not find the following files attached to the message: ${missing.join(', ')}. Available files are: ${files.map(f=>f.name).join(', ')}` },
-                            },
-                        };
-                    }
-                    (finalArgs as any).filesToPackage = filesToPackage;
                 }
             }
 

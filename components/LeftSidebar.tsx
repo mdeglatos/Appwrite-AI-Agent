@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import type { AppwriteProject } from '../types';
 import type { NewAppwriteProject } from '../services/projectService';
 import { AddIcon, DeleteIcon, CloseIcon, ToolsIcon, ProjectsIcon, ChevronDownIcon, ChevronUpIcon, KeyIcon, CheckIcon, SettingsIcon } from './Icons';
+import { toolDefinitionGroups } from '../tools';
 
 // Sub-component for a single tool toggle switch
 const ToolToggle: React.FC<{
@@ -68,12 +68,14 @@ interface LeftSidebarProps {
   onSelect: (project: AppwriteProject) => void;
   activeTools: { [key: string]: boolean };
   onToolsChange: (tools: { [key: string]: boolean }) => void;
-  toolCategories: string[];
   geminiApiKey: string | null;
   geminiModel: string;
   geminiModels: string[];
   geminiThinkingEnabled: boolean;
   onSaveGeminiSettings: (settings: { apiKey: string, model: string, thinkingEnabled: boolean }) => Promise<void>;
+  width: number;
+  isResizing: boolean;
+  onResizeStart: (e: React.MouseEvent) => void;
 }
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({
@@ -86,12 +88,14 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onSelect,
   activeTools,
   onToolsChange,
-  toolCategories,
   geminiApiKey,
   geminiModel,
   geminiModels,
   geminiThinkingEnabled,
-  onSaveGeminiSettings
+  onSaveGeminiSettings,
+  width,
+  isResizing,
+  onResizeStart
 }) => {
   const [name, setName] = useState('');
   const [endpoint, setEndpoint] = useState('');
@@ -107,6 +111,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     gemini: false,
     addProject: false,
   });
+
+  const [expandedToolCategories, setExpandedToolCategories] = useState<{ [key: string]: boolean }>({});
+
 
   useEffect(() => {
     // Populate settings form when props change
@@ -137,8 +144,20 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     setExpandedSections(prev => ({ ...prev, addProject: false, projects: true }));
   };
 
-  const handleToolChange = (tool: string, isChecked: boolean) => {
-    onToolsChange({ ...activeTools, [tool]: isChecked });
+  const handleToolChange = (toolName: string, isChecked: boolean) => {
+    onToolsChange({ ...activeTools, [toolName]: isChecked });
+  };
+
+  const handleCategoryToolsChange = (categoryTools: string[], isChecked: boolean) => {
+    const newActiveTools = { ...activeTools };
+    categoryTools.forEach(toolName => {
+        newActiveTools[toolName] = isChecked;
+    });
+    onToolsChange(newActiveTools);
+  };
+    
+  const toggleToolCategory = (category: string) => {
+    setExpandedToolCategories(prev => ({ ...prev, [category]: !prev[category] }));
   };
   
   const hasGeminiSettingsChanged = (apiKeyInput.trim() !== (geminiApiKey || '')) || (modelInput !== geminiModel) || (thinkingInput !== geminiThinkingEnabled);
@@ -156,6 +175,16 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     setThinkingInput(geminiThinkingEnabled);
   };
 
+  const getIndicatorInfo = (checked: number, total: number) => {
+    if (checked === 0) {
+      return { className: 'bg-gray-500', title: 'None selected' };
+    }
+    if (checked === total && total > 0) {
+      return { className: 'bg-cyan-400', title: 'All selected' };
+    }
+    return { className: 'bg-yellow-400', title: `${checked} of ${total} selected` };
+  };
+
   return (
     <>
       {/* Mobile-only backdrop */}
@@ -167,21 +196,24 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
         aria-hidden="true"
       />
       <aside
+        style={{
+          width: `${width}px`,
+          // When width is 0, also hide the right border to prevent a 1px line from showing
+          borderRightWidth: width === 0 ? '0px' : undefined
+        }}
         className={`
           bg-gray-800/90 backdrop-blur-sm text-gray-300 flex flex-col border-r border-gray-700
-          transition-transform md:transition-all duration-300 ease-in-out flex-shrink-0
+          transition-transform md:transition-width duration-300 ease-in-out flex-shrink-0
           
           fixed md:relative 
           inset-y-0 left-0 z-30 md:z-auto
-          w-full max-w-xs sm:w-80 md:w-auto
+          
           transform ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:transform-none
           
-          ${isOpen ? 'md:w-80' : 'md:w-0'}
-          ${!isOpen && 'md:border-r-0'}
-          overflow-hidden
+          ${isResizing ? 'transition-none select-none' : ''}
         `}
       >
-        <div className="flex flex-col h-full w-full max-w-xs sm:w-80 md:w-80">
+        <div className="flex flex-col h-full w-full overflow-hidden">
           <header className="p-4 border-b border-gray-700 shadow-md bg-gray-900/50 flex justify-between items-center flex-shrink-0">
             <h2 className="text-xl font-bold text-cyan-300">Agent Controls</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-gray-600 md:hidden" aria-label="Close sidebar">
@@ -240,15 +272,62 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
               isExpanded={expandedSections.tools}
               onToggle={() => toggleSection('tools')}
             >
-              <div className="space-y-1">
-                {toolCategories.map(tool => (
-                  <ToolToggle
-                    key={tool}
-                    label={tool}
-                    isChecked={activeTools[tool] ?? false}
-                    onChange={(isChecked) => handleToolChange(tool, isChecked)}
-                  />
-                ))}
+              <div className="space-y-2">
+                <div className="p-1">
+                    <ToolToggle
+                        key="search"
+                        label="search"
+                        isChecked={activeTools['search'] ?? false}
+                        onChange={(isChecked) => handleToolChange('search', isChecked)}
+                    />
+                </div>
+
+                {Object.entries(toolDefinitionGroups).map(([category, tools]) => {
+                    const categoryToolNames = tools.map(t => t.name);
+                    const checkedCount = categoryToolNames.filter(tool => activeTools[tool]).length;
+                    const totalCount = categoryToolNames.length;
+                    const isExpanded = expandedToolCategories[category] ?? false;
+                    const indicator = getIndicatorInfo(checkedCount, totalCount);
+
+                    return (
+                        <div key={category} className="bg-gray-700/30 rounded-lg">
+                            <div className="group p-2 cursor-pointer hover:bg-gray-700/50" onClick={() => toggleToolCategory(category)}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${indicator.className}`} title={indicator.title}></span>
+                                        <span className="font-semibold capitalize text-gray-200">{category}</span>
+                                        <span className="text-xs text-gray-400 font-mono">({checkedCount}/{totalCount})</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button 
+                                                onClick={(e) => {e.stopPropagation(); handleCategoryToolsChange(categoryToolNames, true);}}
+                                                className="text-xs font-semibold text-cyan-400 hover:underline px-1"
+                                            >All</button>
+                                            <button 
+                                                onClick={(e) => {e.stopPropagation(); handleCategoryToolsChange(categoryToolNames, false);}}
+                                                className="text-xs font-semibold text-gray-400 hover:underline px-1"
+                                            >None</button>
+                                        </div>
+                                        {isExpanded ? <ChevronUpIcon size={18} /> : <ChevronDownIcon size={18} />}
+                                    </div>
+                                </div>
+                            </div>
+                            {isExpanded && (
+                                <div className="border-t border-gray-600/50 p-2 pl-4 space-y-1">
+                                    {tools.map(tool => (
+                                        <ToolToggle
+                                            key={tool.name}
+                                            label={tool.name}
+                                            isChecked={activeTools[tool.name] ?? false}
+                                            onChange={(isChecked) => handleToolChange(tool.name, isChecked)}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
               </div>
             </CollapsibleSection>
 
@@ -348,6 +427,24 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             </CollapsibleSection>
           </div>
         </div>
+        
+        {/* Resizer Handle */}
+        {isOpen && (
+            <div
+                role="separator"
+                onMouseDown={onResizeStart}
+                className={`
+                    hidden md:block absolute top-0 right-0 h-full w-2 cursor-col-resize group
+                    ${isResizing ? 'bg-cyan-600/50' : ''}
+                `}
+                aria-label="Resize sidebar"
+            >
+                <div className={`
+                    mx-auto w-0.5 h-full bg-gray-700 group-hover:bg-cyan-400 transition-colors
+                    ${isResizing ? 'bg-cyan-500' : ''}
+                `} />
+            </div>
+        )}
       </aside>
     </>
   );

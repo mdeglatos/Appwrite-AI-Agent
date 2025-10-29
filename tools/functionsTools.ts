@@ -1,3 +1,4 @@
+
 import { getSdkFunctions, ID, Query } from '../services/appwrite';
 import type { AIContext, AppwriteProject } from '../types';
 import { Type, type FunctionDeclaration } from '@google/genai';
@@ -316,16 +317,6 @@ async function updateFunction(context: AIContext, { functionId, name, runtime, e
     }
 }
 
-
-async function updateFunctionDeployment(context: AIContext, { functionId, deploymentId }: { functionId: string, deploymentId: string }) {
-    try {
-        const functions = getSdkFunctions(context.project);
-        return await functions.updateDeployment(functionId, deploymentId);
-    } catch (error) {
-        return handleApiError(error);
-    }
-}
-
 async function deleteFunction(context: AIContext, { functionId }: { functionId: string }) {
     try {
         const functions = getSdkFunctions(context.project);
@@ -370,14 +361,14 @@ async function getFunctionDeploymentCode(context: AIContext, { functionId, deplo
     }
 }
 
-async function createAndDeployFunction(context: AIContext, { functionId, activate, entrypoint, commands, files }: { 
+async function deployNewCodeToFunction(context: AIContext, { functionId, activate, entrypoint, commands, files }: { 
     functionId: string, 
     activate: boolean, 
     entrypoint?: string, 
     commands?: string,
     files: { name: string, content: string }[],
 }) {
-    console.log(`Executing createAndDeployFunction tool for function '${functionId}'`);
+    console.log(`Executing deployNewCodeToFunction tool for function '${functionId}'`);
     try {
         console.log(`Packaging in-memory files: ${files.map(f => f.name).join(', ')}`);
         const result = await deployCodeFromString(context.project, functionId, files, activate, entrypoint, commands);
@@ -387,60 +378,6 @@ async function createAndDeployFunction(context: AIContext, { functionId, activat
         return handleApiError(error);
     }
 }
-
-async function packageAndDeployFunction(context: AIContext, { functionId, activate, entrypoint, commands, filesToPackage }: { 
-    functionId: string, 
-    activate: boolean, 
-    entrypoint?: string, 
-    commands?: string,
-    filesToPackage?: File[], // Injected by geminiService
-}) {
-    console.log(`Executing packageAndDeployFunction for function '${functionId}'`);
-    
-    if (!filesToPackage || filesToPackage.length === 0) {
-        return { error: 'No source files were found to package. Ensure the fileNames argument matches attached files.' };
-    }
-    console.log(`Packaging files: ${filesToPackage.map(f => f.name).join(', ')}`);
-
-    try {
-        const codeBlob = await createTarGzFromFiles(filesToPackage);
-        const codeFile = new File([codeBlob], 'code.tar.gz', { type: 'application/gzip' });
-
-        // Now, use the same logic as createDeployment
-        const formData = new FormData();
-        formData.append('code', codeFile);
-        formData.append('activate', String(activate));
-        if (entrypoint) {
-            formData.append('entrypoint', entrypoint);
-        }
-        if (commands) {
-            formData.append('commands', commands);
-        }
-
-        console.log(`Uploading packaged code to function '${functionId}'...`);
-
-        const response = await fetch(`${context.project.endpoint}/functions/${functionId}/deployments`, {
-            method: 'POST',
-            headers: {
-                'X-Appwrite-Project': context.project.projectId,
-                'X-Appwrite-Key': context.project.apiKey,
-            },
-            body: formData,
-        });
-
-        const jsonResponse = await response.json();
-
-        if (!response.ok) {
-            throw new Error(jsonResponse.message || `Deployment creation failed with status ${response.status}`);
-        }
-
-        console.log('Deployment successful:', jsonResponse);
-        return jsonResponse;
-    } catch (error) {
-        return handleApiError(error);
-    }
-}
-
 
 async function createDeployment(context: AIContext, { functionId, activate, entrypoint, commands, codeFile }: { 
     functionId: string, 
@@ -621,12 +558,10 @@ export const functionsFunctions = {
     getFunction,
     listFunctions,
     updateFunction,
-    updateFunctionDeployment,
     deleteFunction,
     listRuntimes,
     getFunctionDeploymentCode,
-    createAndDeployFunction,
-    packageAndDeployFunction,
+    deployNewCodeToFunction,
     createDeployment,
     getDeployment,
     listDeployments,
@@ -718,18 +653,6 @@ export const functionsToolDefinitions: FunctionDeclaration[] = [
         }
     },
     {
-        name: 'updateFunctionDeployment',
-        description: "Update the function's active deployment.",
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                functionId: { type: Type.STRING, description: 'Function ID.' },
-                deploymentId: { type: Type.STRING, description: 'Deployment ID to activate.' },
-            },
-            required: ['functionId', 'deploymentId'],
-        }
-    },
-    {
         name: 'deleteFunction',
         description: 'Delete a function by its unique ID.',
         parameters: {
@@ -758,8 +681,8 @@ export const functionsToolDefinitions: FunctionDeclaration[] = [
         }
     },
     {
-        name: 'createAndDeployFunction',
-        description: 'Generates source code files in memory, packages them into a .tar.gz archive, and deploys it to a new function deployment. Use this when the user asks to create a function with specific logic, as it allows you to write the code yourself.',
+        name: 'deployNewCodeToFunction',
+        description: 'Deploys new or updated code to a function. The code is provided as an array of file objects, each with a "name" and "content" property. Use this when the user asks to create, update, or write code for a function, as it allows you to generate the complete source code yourself.',
         parameters: {
             type: Type.OBJECT,
             properties: {
@@ -781,21 +704,6 @@ export const functionsToolDefinitions: FunctionDeclaration[] = [
                 commands: { type: Type.STRING, description: 'Optional. Build commands to run during deployment (e.g., "npm install").' },
             },
             required: ['functionId', 'files', 'activate'],
-        }
-    },
-    {
-        name: 'packageAndDeployFunction',
-        description: 'Takes multiple user-attached source code files (e.g., index.js, package.json), packages them into a .tar.gz archive, and deploys it to a function. Use this instead of createDeployment when the user provides raw source files instead of a pre-made archive.',
-        parameters: {
-            type: Type.OBJECT,
-            properties: {
-                functionId: { type: Type.STRING, description: 'Function ID for which to create the deployment.' },
-                fileNames: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'An array of filenames to include in the package. These MUST match the names of files attached to the user\'s message.' },
-                activate: { type: Type.BOOLEAN, description: 'Automatically activate the deployment when it is finished building.' },
-                entrypoint: { type: Type.STRING, description: 'Optional. Entrypoint file within the code package (e.g., "src/index.js").' },
-                commands: { type: Type.STRING, description: 'Optional. Build commands to run during deployment (e.g., "npm install").' },
-            },
-            required: ['functionId', 'fileNames', 'activate'],
         }
     },
     {
