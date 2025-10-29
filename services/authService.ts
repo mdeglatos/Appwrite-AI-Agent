@@ -1,3 +1,4 @@
+
 import { ID, type Models } from 'appwrite';
 import { account } from './appwrite';
 import type { UserPrefs } from '../types';
@@ -47,4 +48,10 @@ export async function updateGeminiPrefs(prefs: { apiKey?: string | null; model?:
     }
 
     await account.updatePrefs(newPrefs);
+}
+
+export async function updateToolsPrefs(tools: { [key: string]: boolean }): Promise<void> {
+    const user = await account.get<UserPrefs>();
+    const currentPrefs = user.prefs || {};
+    await account.updatePrefs({ ...currentPrefs, activeTools: tools });
 }

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { AppwriteProject } from '../types';
 import type { NewAppwriteProject } from '../services/projectService';
@@ -63,7 +64,7 @@ interface LeftSidebarProps {
   projects: AppwriteProject[];
   activeProject: AppwriteProject | null;
   onSave: (projectData: NewAppwriteProject) => void;
-  onDelete: (projectId: string) => void;
+  onDelete: (projectId: string, projectName: string) => void;
   onSelect: (project: AppwriteProject) => void;
   activeTools: { [key: string]: boolean };
   onToolsChange: (tools: { [key: string]: boolean }) => void;
@@ -222,7 +223,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                       <p className="text-xs text-gray-400 truncate">{p.projectId}</p>
                     </div>
                     <button
-                      onClick={(e) => { e.stopPropagation(); if(confirm(`Are you sure you want to delete "${p.name}"?`)) onDelete(p.$id); }}
+                      onClick={(e) => { e.stopPropagation(); onDelete(p.$id, p.name); }}
                       className="text-gray-500 hover:text-red-400 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 flex-shrink-0"
                       aria-label={`Delete ${p.name}`}
                     >

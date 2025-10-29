@@ -59,6 +59,7 @@ export interface UserPrefs extends Models.Preferences {
   geminiApiKey?: string | null;
   geminiModel?: string | null;
   geminiThinking?: boolean | null;
+  activeTools?: { [key: string]: boolean };
 }
 
 // Custom types for Appwrite resources since they are not exported in some SDK versions.

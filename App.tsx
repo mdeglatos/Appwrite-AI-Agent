@@ -11,12 +11,13 @@ import type { Message, AppwriteProject, UserPrefs, UserMessage, ModelMessage, Da
 import type { NewAppwriteProject } from './services/projectService';
 import type { Chat, Content } from '@google/genai';
 import type { Models } from 'appwrite';
-import { getAccount, logout, updateGeminiPrefs } from './services/authService';
+import { getAccount, logout, updateGeminiPrefs, updateToolsPrefs } from './services/authService';
 import * as projectService from './services/projectService';
 import LoginPage from './components/LoginPage';
 import { getSdkDatabases, getSdkStorage, getSdkFunctions, Query } from './services/appwrite';
 import { downloadAndUnpackDeployment, type UnpackedFile, deployCodeFromString } from './tools/functionsTools';
 import { CodeViewerSidebar } from './components/CodeViewerSidebar';
+import { ConfirmationModal } from './components/ConfirmationModal';
 
 // Define tool categories as a top-level constant
 const toolCategories = ['database', 'storage', 'functions', 'users', 'teams', 'search'];
@@ -87,12 +88,24 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
 
-  const [activeTools, setActiveTools] = useState(() =>
-    toolCategories.reduce((acc, tool) => ({ ...acc, [tool]: true }), {})
-  );
+  const [activeTools, setActiveTools] = useState(() => {
+    const savedTools = currentUser.prefs.activeTools;
+    if (savedTools && typeof savedTools === 'object') {
+        // Ensure all categories from the constant are present, defaulting to true for any new ones.
+        return toolCategories.reduce((acc, tool) => ({
+            ...acc,
+            [tool]: savedTools.hasOwnProperty(tool) ? savedTools[tool] : true,
+        }), {});
+    }
+    // Default if nothing is saved: all tools are on.
+    return toolCategories.reduce((acc, tool) => ({ ...acc, [tool]: true }), {});
+  });
+
   const [chat, setChat] = useState<Chat | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const prevContextForReset = useRef({ projectId: activeProject?.$id, isCodeModeActive: false });
+  const prevSelectedFunctionId = useRef<string | null | undefined>();
 
   const geminiApiKey = currentUser.prefs.geminiApiKey || null;
   const geminiModel = currentUser.prefs.geminiModel || DEFAULT_GEMINI_MODEL;
@@ -116,6 +129,15 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
   const [editedFunctionFiles, setEditedFunctionFiles] = useState<UnpackedFile[] | null>(null); // Editable copy
   const [isCodeViewerSidebarOpen, setIsCodeViewerSidebarOpen] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
+  
+  const [confirmationState, setConfirmationState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    confirmButtonClass: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const CONTEXT_FETCH_LIMIT = 100;
 
@@ -258,7 +280,7 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
       const fetchCollections = async () => {
           logCallback(`Fetching collections for database "${selectedDatabase.name}"...`);
           setIsContextLoading(true);
-          setError(null);
+setError(null);
           try {
               const projectDatabases = getSdkDatabases(activeProject);
               const response = await projectDatabases.listCollections(selectedDatabase.$id, [Query.limit(CONTEXT_FETCH_LIMIT)]);
@@ -287,9 +309,17 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
 
   }, [selectedDatabase, activeProject, logCallback, CONTEXT_FETCH_LIMIT]);
 
-  // Re-initialize chat session when project, tools, model, or context selection changes
-  // This now handles Code Mode context loading.
+  // This central useEffect hook manages the AI chat session's lifecycle.
+  // It intelligently decides whether to perform a "hard reset" (clearing chat history)
+  // or a "soft reset" (preserving history while updating settings).
   useEffect(() => {
+    const functionHasChanged = selectedFunction?.$id !== prevSelectedFunctionId.current;
+    
+    // Check for conditions that require a hard reset of the chat history.
+    const didProjectChange = prevContextForReset.current.projectId !== activeProject?.$id;
+    const didModeChange = prevContextForReset.current.isCodeModeActive !== isCodeModeActive;
+    const isHardReset = didProjectChange || didModeChange;
+
     const initializeSession = async () => {
         if (!activeProject) {
             setChat(null);
@@ -304,89 +334,102 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
             bucket: selectedBucket,
             fn: selectedFunction,
         };
+        
+        let initialHistory: Content[] | undefined;
 
-        let initialHistory: Content[] | undefined = undefined;
+        // On a hard reset (project/mode change), clear history and messages.
+        // Otherwise, preserve the history from the previous chat session.
+        if (isHardReset) {
+            setMessages([]);
+            initialHistory = undefined;
+        } else {
+            initialHistory = chat?.history;
+        }
 
         if (isCodeModeActive && selectedFunction) {
-            setIsFunctionContextLoading(true);
-            setMessages([]); // Start fresh for the new function context
-            setFunctionFiles(null);
-            setEditedFunctionFiles(null);
-            setIsCodeViewerSidebarOpen(false);
-            logCallback(`Code Mode: Loading context for function "${selectedFunction.name}"...`);
-            setError(null);
-            
-            try {
-                const projectFunctions = getSdkFunctions(activeProject);
-                let deploymentId = selectedFunction.deployment;
+            // A function change in code mode is a special type of reset,
+            // as it needs to load a new code context.
+            if (functionHasChanged) {
+                setIsFunctionContextLoading(true);
+                setMessages([]); // Start fresh for the new function context
+                setFunctionFiles(null);
+                setEditedFunctionFiles(null);
+                setIsCodeViewerSidebarOpen(false);
+                logCallback(`Code Mode: Loading context for function "${selectedFunction.name}"...`);
+                setError(null);
                 
-                // If the deployment ID is missing from the function object retrieved via list(),
-                // fetch the full function details to get the active deployment ID.
-                if (!deploymentId) {
-                    logCallback(`Deployment ID not found on initial function object. Fetching details for "${selectedFunction.name}"...`);
-                    const fullFunctionDetails = await projectFunctions.get(selectedFunction.$id);
-                    deploymentId = fullFunctionDetails.deployment;
-                }
-
-                // If there's still no *active* deployment, find the latest successful one.
-                if (!deploymentId) {
-                    logCallback(`Function "${selectedFunction.name}" has no active deployment set. Searching for the latest successful deployment...`);
-                    const deploymentsList = await projectFunctions.listDeployments(
-                        selectedFunction.$id, 
-                        [Query.orderDesc('$createdAt')]
-                    );
+                try {
+                    const projectFunctions = getSdkFunctions(activeProject);
+                    let deploymentId = selectedFunction.deployment;
                     
-                    const latestReadyDeployment = deploymentsList.deployments.find(d => d.status === 'ready');
-                    
-                    if (latestReadyDeployment) {
-                        deploymentId = latestReadyDeployment.$id;
-                        logCallback(`Found latest ready deployment: ${deploymentId}. Using it for Code Mode.`);
-                    } else {
-                        logCallback(`No ready deployments found for function "${selectedFunction.name}".`);
+                    if (!deploymentId) {
+                        logCallback(`Deployment ID not found on initial function object. Fetching details for "${selectedFunction.name}"...`);
+                        const fullFunctionDetails = await projectFunctions.get(selectedFunction.$id);
+                        deploymentId = fullFunctionDetails.deployment;
                     }
-                } else {
-                    logCallback(`Found active deployment ID: ${deploymentId}`);
-                }
-                
-                const files = await downloadAndUnpackDeployment(activeProject, selectedFunction.$id, deploymentId);
-                
-                if (files && files.length > 0) {
-                    setFunctionFiles(files);
-                    setEditedFunctionFiles(JSON.parse(JSON.stringify(files))); // Deep copy for editing
-                    setIsCodeViewerSidebarOpen(true);
-                    logCallback(`Code Mode: Found ${files.length} file(s). Building context message.`);
+
+                    if (!deploymentId) {
+                        logCallback(`Function "${selectedFunction.name}" has no active deployment set. Searching for the latest successful deployment...`);
+                        const deploymentsList = await projectFunctions.listDeployments(
+                            selectedFunction.$id, 
+                            [Query.orderDesc('$createdAt')]
+                        );
+                        
+                        const latestReadyDeployment = deploymentsList.deployments.find(d => d.status === 'ready');
+                        
+                        if (latestReadyDeployment) {
+                            deploymentId = latestReadyDeployment.$id;
+                            logCallback(`Found latest ready deployment: ${deploymentId}. Using it for Code Mode.`);
+                        } else {
+                            logCallback(`No ready deployments found for function "${selectedFunction.name}".`);
+                        }
+                    } else {
+                        logCallback(`Found active deployment ID: ${deploymentId}`);
+                    }
                     
-                    const fileParts = files.map(file => `File: \`${file.name}\`\n\`\`\`\n${file.content}\n\`\`\``).join('\n\n');
-                    const userPrompt = `I need to work on an existing Appwrite function named "${selectedFunction.name}". Please load the following files from its active deployment into your context. I will provide further instructions in my next prompt.\n\n${fileParts}`;
-                    const modelResponseText = `Understood. I have loaded the code for the function **${selectedFunction.name}**. I am now operating with the full context of this function, including the following files: ${files.map(f => `\`${f.name}\``).join(', ')}. I am ready for your instructions. You can ask me to make changes, or you can edit the code directly in the side panel and deploy your changes.`;
+                    const files = await downloadAndUnpackDeployment(activeProject, selectedFunction.$id, deploymentId);
+                    
+                    if (files && files.length > 0) {
+                        setFunctionFiles(files);
+                        setEditedFunctionFiles(JSON.parse(JSON.stringify(files))); // Deep copy for editing
+                        setIsCodeViewerSidebarOpen(true);
+                        logCallback(`Code Mode: Found ${files.length} file(s). Building context message.`);
+                        
+                        const fileParts = files.map(file => `File: \`${file.name}\`\n\`\`\`\n${file.content}\n\`\`\``).join('\n\n');
+                        const userPrompt = `I need to work on an existing Appwrite function named "${selectedFunction.name}". Please load the following files from its active deployment into your context. I will provide further instructions in my next prompt.\n\n${fileParts}`;
+                        const modelResponseText = `Understood. I have loaded the code for the function **${selectedFunction.name}**. I am now operating with the full context of this function, including the following files: ${files.map(f => `\`${f.name}\``).join(', ')}. I am ready for your instructions. You can ask me to make changes, or you can edit the code directly in the side panel and deploy your changes.`;
 
-                    initialHistory = [
-                        { role: 'user', parts: [{ text: userPrompt }] },
-                        { role: 'model', parts: [{ text: modelResponseText }] },
-                    ];
+                        initialHistory = [
+                            { role: 'user', parts: [{ text: userPrompt }] },
+                            { role: 'model', parts: [{ text: modelResponseText }] },
+                        ];
 
-                    const contextMessage: ModelMessage = { id: crypto.randomUUID(), role: 'model', content: modelResponseText };
-                    setMessages([contextMessage]);
-                } else {
-                    setFunctionFiles(null);
-                    setEditedFunctionFiles(null);
-                    logCallback(`Code Mode: Active deployment for "${selectedFunction.name}" is empty or could not be downloaded.`);
-                    const modelResponseText = `The context is set to the function **${selectedFunction.name}**. Its active deployment appears to be empty or could not be found. I'm ready to help you write the initial code from scratch.`;
-                    const contextMessage: ModelMessage = { id: crypto.randomUUID(), role: 'model', content: modelResponseText };
-                    setMessages([contextMessage]);
+                        const contextMessage: ModelMessage = { id: crypto.randomUUID(), role: 'model', content: modelResponseText };
+                        setMessages([contextMessage]);
+                    } else {
+                        setFunctionFiles(null);
+                        setEditedFunctionFiles(null);
+                        logCallback(`Code Mode: Active deployment for "${selectedFunction.name}" is empty or could not be downloaded.`);
+                        const modelResponseText = `The context is set to the function **${selectedFunction.name}**. Its active deployment appears to be empty or could not be found. I'm ready to help you write the initial code from scratch.`;
+                        const contextMessage: ModelMessage = { id: crypto.randomUUID(), role: 'model', content: modelResponseText };
+                        setMessages([contextMessage]);
+                    }
+                } catch (e) {
+                    const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+                    setError(`Failed to load function code: ${errorMessage}`);
+                    logCallback(`ERROR loading function code: ${errorMessage}`);
+                } finally {
+                    setIsFunctionContextLoading(false);
                 }
-            } catch (e) {
-                const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
-                setError(`Failed to load function code: ${errorMessage}`);
-                logCallback(`ERROR loading function code: ${errorMessage}`);
-            } finally {
-                setIsFunctionContextLoading(false);
             }
         } else if (isCodeModeActive && !selectedFunction) {
-            setMessages([]); // Clear messages when in code mode but no function is selected
-            setFunctionFiles(null);
-            setEditedFunctionFiles(null);
-            setIsCodeViewerSidebarOpen(false);
+            // If in code mode but no function is selected, ensure the chat is clear.
+            if (functionHasChanged || isHardReset) {
+                setMessages([]); 
+                setFunctionFiles(null);
+                setEditedFunctionFiles(null);
+                setIsCodeViewerSidebarOpen(false);
+            }
         } else if (!isCodeModeActive) {
             setFunctionFiles(null);
             setEditedFunctionFiles(null);
@@ -416,6 +459,9 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
     };
 
     initializeSession();
+    // After the effect runs, update the refs for the next render to track changes.
+    prevContextForReset.current = { projectId: activeProject?.$id, isCodeModeActive };
+    prevSelectedFunctionId.current = selectedFunction?.$id;
   }, [activeProject, activeTools, logCallback, geminiApiKey, geminiModel, geminiThinkingEnabled, selectedDatabase, selectedCollection, selectedBucket, selectedFunction, isCodeModeActive]);
 
 
@@ -455,11 +501,21 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
     }
   }, [activeProject, logCallback, refreshUser]);
 
+  const requestProjectDeletion = useCallback((projectId: string, projectName: string) => {
+    setConfirmationState({
+        isOpen: true,
+        title: `Delete Project "${projectName}"?`,
+        message: 'This action is irreversible. The project will be permanently removed from your list.',
+        confirmText: 'Delete Project',
+        confirmButtonClass: 'bg-red-600 hover:bg-red-700',
+        onConfirm: () => {
+            handleDeleteProject(projectId);
+            setConfirmationState(null);
+        },
+    });
+  }, [handleDeleteProject]);
+
   const handleSelectProject = useCallback(async (project: AppwriteProject) => {
-    if (activeProject?.$id !== project.$id) {
-        setMessages([]); // Clear chat if switching to a DIFFERENT project
-        resetContext(); // Clear context selections like DB, Collection, Bucket
-    }
     setActiveProject(project);
     setIsLeftSidebarOpen(false); // Close sidebar on project selection
     try {
@@ -470,7 +526,7 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
         setError(`Failed to set active project: ${errorMessage}`);
         logCallback(`ERROR setting active project: ${errorMessage}`);
     }
-  }, [logCallback, refreshUser, activeProject, resetContext]);
+  }, [logCallback, refreshUser]);
 
   const handleSaveGeminiSettings = useCallback(async (settings: { apiKey: string; model: string; thinkingEnabled: boolean; }) => {
       try {
@@ -487,6 +543,18 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
           logCallback(`ERROR saving Gemini settings: ${errorMessage}`);
       }
   }, [refreshUser, logCallback]);
+
+  const handleToolsChange = useCallback(async (newTools: { [key: string]: boolean }) => {
+    setActiveTools(newTools);
+    try {
+        await updateToolsPrefs(newTools);
+        logCallback('Agent tools selection saved.');
+    } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+        setError(`Failed to save tool preferences: ${errorMessage}`);
+        logCallback(`ERROR saving tool preferences: ${errorMessage}`);
+    }
+  }, [logCallback]);
 
   const handleCodeGenerated = useCallback((newFiles: { name: string; content: string }[]) => {
       logCallback("Code Mode: AI has generated new code. The editor panel has been updated.");
@@ -570,10 +638,6 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
   const handleClearChat = () => {
     setMessages([]);
     logCallback('Chat history cleared by user.');
-    // To force a reset of the AI session, we can re-trigger the main useEffect.
-    // A clean way is to force a re-render or re-call the init logic.
-    // For now, the session will be reset on the next message due to empty history.
-    // Or we can explicitly re-init.
     if (activeProject) {
         try {
             const context: AIContext = {
@@ -583,6 +647,7 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
                 bucket: selectedBucket,
                 fn: selectedFunction,
             };
+            // Create a new session with empty history.
             const newChat = createChatSession(activeTools, geminiModel, context, geminiThinkingEnabled, geminiApiKey, isCodeModeActive);
             setChat(newChat);
             logCallback('AI session has been reset.');
@@ -598,17 +663,23 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
     const handleToggleCodeMode = () => {
         const changingTo = !isCodeModeActive;
         if (messages.length > 0) {
-            const confirmation = confirm(
-                `Switching to ${changingTo ? "'Code Mode'" : "'Agent Mode'"} will start a new session and clear your current chat history. Are you sure you want to continue?`
-            );
-            if (!confirmation) {
-                return;
-            }
+            setConfirmationState({
+                isOpen: true,
+                title: `Switch to ${changingTo ? "'Code Mode'" : "'Agent Mode'"}?`,
+                message: 'Switching modes will start a new session and clear your current chat history. Are you sure you want to continue?',
+                confirmText: 'Switch Mode',
+                confirmButtonClass: 'bg-cyan-600 hover:bg-cyan-700',
+                onConfirm: () => {
+                    setIsCodeModeActive(prev => !prev);
+                    logCallback(`Switched to ${changingTo ? 'Code Mode' : 'Agent Mode'}. Session will reset.`);
+                    setConfirmationState(null);
+                },
+            });
+        } else {
+            // If no messages, switch directly
+            setIsCodeModeActive(prev => !prev);
+            logCallback(`Switched to ${changingTo ? 'Code Mode' : 'Agent Mode'}. Session will reset.`);
         }
-        
-        setIsCodeModeActive(prev => !prev);
-        setMessages([]); // Let the main useEffect handle the full reset and messaging
-        logCallback(`Switched to ${changingTo ? 'Code Mode' : 'Agent Mode'}. Session reset.`);
     };
     
     const handleCodeChange = (fileName: string, newContent: string) => {
@@ -751,10 +822,10 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
         projects={projects}
         activeProject={activeProject}
         onSave={handleSaveProject}
-        onDelete={handleDeleteProject}
+        onDelete={requestProjectDeletion}
         onSelect={handleSelectProject}
         activeTools={activeTools}
-        onToolsChange={setActiveTools}
+        onToolsChange={handleToolsChange}
         toolCategories={toolCategories}
         geminiApiKey={geminiApiKey}
         geminiModel={geminiModel}
@@ -949,6 +1020,17 @@ const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser 
         logs={sessionLogs}
         onClear={() => setSessionLogs([])}
       />
+       {confirmationState?.isOpen && (
+        <ConfirmationModal
+            isOpen={confirmationState.isOpen}
+            title={confirmationState.title}
+            message={confirmationState.message}
+            onConfirm={confirmationState.onConfirm}
+            onClose={() => setConfirmationState(null)}
+            confirmText={confirmationState.confirmText}
+            confirmButtonClass={confirmationState.confirmButtonClass}
+        />
+      )}
     </div>
   );
 };
