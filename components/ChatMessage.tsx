@@ -4,12 +4,9 @@ import { UserIcon, BotIcon, AttachmentIcon, SourcesIcon } from './Icons';
 import { marked } from 'marked';
 import { ActionMessageComponent } from './ActionMessage';
 
-// Configure marked to handle code blocks and other elements nicely.
-// It's good practice to set options at the top level.
-// This ensures gfm (for tables, etc.) and line breaks are handled.
 marked.setOptions({
-  gfm: true, // Github Flavored Markdown
-  breaks: true, // Add <br> on single line breaks
+  gfm: true,
+  breaks: true,
 });
 
 interface ChatMessageProps {
@@ -17,7 +14,6 @@ interface ChatMessageProps {
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
-  // If the message is a tool call, render the specific component for it.
   if (message.role === 'action') {
     return <ActionMessageComponent message={message} />;
   }
@@ -26,138 +22,116 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // This effect runs after render to add copy buttons to code blocks
     if (contentRef.current && message.role === 'model') {
       const preElements = contentRef.current.querySelectorAll('pre');
-
       preElements.forEach(preEl => {
-        if (preEl.parentElement?.classList.contains('code-block-wrapper')) {
-          return; // Already processed
-        }
+        if (preEl.parentElement?.classList.contains('code-block-wrapper')) return;
 
         const codeEl = preEl.querySelector('code');
-        if (!codeEl) {
-          return;
-        }
+        if (!codeEl) return;
 
-        // Create a wrapper for relative positioning and hover detection
+        // Styled wrapper for code blocks
         const wrapper = document.createElement('div');
-        wrapper.className = 'code-block-wrapper relative group';
+        wrapper.className = 'code-block-wrapper relative group rounded-lg overflow-hidden my-4 border border-gray-700/50 shadow-sm';
         preEl.parentNode?.insertBefore(wrapper, preEl);
-        wrapper.appendChild(preEl);
-
+        
+        // Header for code block
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between px-4 py-2 bg-gray-800/80 border-b border-gray-700/50 text-xs text-gray-400 select-none';
+        const lang = codeEl.className.replace('language-', '') || 'code';
+        header.textContent = lang;
+        
         const button = document.createElement('button');
-        button.className = 'absolute top-2 right-2 flex items-center gap-1.5 px-2 py-1 bg-gray-600 hover:bg-gray-500 text-gray-200 rounded-md text-xs font-semibold transition-all z-10 opacity-0 group-hover:opacity-100 focus:opacity-100';
-        button.ariaLabel = 'Copy code';
-
-        const copyIconSvg = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>`;
-        const copyTextSpan = document.createElement('span');
-        copyTextSpan.textContent = 'Copy';
-
-        button.innerHTML = copyIconSvg;
-        button.appendChild(copyTextSpan);
-
+        button.className = 'flex items-center gap-1.5 px-2 py-0.5 hover:bg-gray-700/80 rounded text-gray-300 text-xs font-medium transition-colors';
+        button.innerHTML = '<span>Copy</span>';
+        
         button.onclick = () => {
           navigator.clipboard.writeText(codeEl.innerText).then(() => {
-            const checkIconSvg = `<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
-            copyTextSpan.textContent = 'Copied!';
-            button.innerHTML = checkIconSvg;
-            button.appendChild(copyTextSpan);
-
-            setTimeout(() => {
-              copyTextSpan.textContent = 'Copy';
-              button.innerHTML = copyIconSvg;
-              button.appendChild(copyTextSpan);
-            }, 2000);
-          }).catch(err => {
-            console.error('Failed to copy code: ', err);
-            copyTextSpan.textContent = 'Failed';
-            setTimeout(() => {
-              copyTextSpan.textContent = 'Copy';
-              button.innerHTML = copyIconSvg;
-              button.appendChild(copyTextSpan);
-            }, 2000);
+            button.innerHTML = '<span class="text-green-400">Copied!</span>';
+            setTimeout(() => { button.innerHTML = '<span>Copy</span>'; }, 2000);
           });
         };
 
-        wrapper.appendChild(button);
+        header.appendChild(button);
+        wrapper.appendChild(header);
+        wrapper.appendChild(preEl);
+        
+        // Style the pre element to fit nicely
+        preEl.className += " !m-0 !bg-gray-900/90 !p-4 overflow-x-auto text-sm font-mono";
       });
     }
   }, [message.content, message.role, message.id]);
 
   return (
-    <div className={`flex items-start gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
-      {!isUser && (
-        <div className="w-8 h-8 flex-shrink-0 bg-cyan-600 rounded-full flex items-center justify-center">
-          <BotIcon />
-        </div>
-      )}
-      <div
-        className={`px-4 py-3 rounded-xl max-w-xl md:max-w-2xl break-words ${
-          isUser
-            ? 'bg-blue-600 text-white rounded-br-none'
-            : 'bg-gray-700 text-gray-200 rounded-bl-none'
-        }`}
-      >
-        {message.role === 'user' && message.files && message.files.length > 0 && (
-            <div className="mb-2 space-y-1">
+    <div className={`flex gap-4 animate-slide-up ${isUser ? 'flex-row-reverse' : 'flex-row'} max-w-4xl mx-auto w-full`}>
+      {/* Avatar */}
+      <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-lg z-10 ${
+          isUser 
+            ? 'bg-gradient-to-br from-cyan-600 to-blue-700 text-white' 
+            : 'bg-gray-800 border border-gray-700 text-cyan-400'
+      }`}>
+        {isUser ? <UserIcon /> : <BotIcon />}
+      </div>
+
+      {/* Message Bubble */}
+      <div className={`flex flex-col max-w-[85%] sm:max-w-[75%] ${isUser ? 'items-end' : 'items-start'}`}>
+        
+        {/* Attachments (User) */}
+        {isUser && message.files && message.files.length > 0 && (
+            <div className="mb-2 flex flex-wrap justify-end gap-2">
                 {message.files.map((file, index) => (
-                    <div key={index} className="p-2 bg-blue-700/60 rounded-lg flex items-center gap-2 border border-blue-500/50">
-                        <AttachmentIcon />
-                        <span className="font-medium text-sm truncate">{file.name}</span>
+                    <div key={index} className="px-3 py-2 bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg flex items-center gap-2 text-xs text-gray-300 shadow-sm">
+                        <AttachmentIcon size={14} />
+                        <span className="truncate max-w-[150px]">{file.name}</span>
                     </div>
                 ))}
             </div>
         )}
-        
-        {message.content && (
-            isUser ? (
-                <p className="whitespace-pre-wrap">{message.content}</p>
+
+        <div
+          className={`px-5 py-4 rounded-2xl shadow-sm border backdrop-blur-sm ${
+            isUser
+              ? 'bg-cyan-600/10 border-cyan-500/20 text-gray-100 rounded-tr-none'
+              : 'bg-gray-800/40 border-white/5 text-gray-200 rounded-tl-none'
+          }`}
+        >
+            {message.content ? (
+                isUser ? (
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+                ) : (
+                    <div 
+                        ref={contentRef}
+                        className="prose prose-invert prose-sm max-w-none 
+                        prose-p:leading-relaxed prose-a:text-cyan-400 prose-a:no-underline hover:prose-a:underline
+                        prose-headings:text-gray-100 prose-headings:font-semibold
+                        prose-ul:my-2 prose-li:my-0.5
+                        prose-strong:text-cyan-300"
+                        dangerouslySetInnerHTML={{ __html: marked.parse(message.content) as string }} 
+                    />
+                )
             ) : (
-                <div 
-                    ref={contentRef}
-                    className="prose prose-invert prose-sm max-w-none prose-p:my-2 prose-headings:my-3 prose-ul:my-2 prose-ol:my-2"
-                    dangerouslySetInnerHTML={{ __html: marked.parse(message.content) as string }} 
-                />
-            )
-        )}
+               isUser && <p className="italic text-gray-400 text-sm">Sent {message.files?.length} file(s).</p>
+            )}
+        </div>
 
-        {message.role === 'user' && !message.content && message.files && message.files.length > 0 && <p className="italic text-blue-200">{message.files.length} file(s) attached.</p>}
-
+        {/* Sources (Model) */}
         {message.role === 'model' && message.groundingChunks && message.groundingChunks.filter(c => c.web).length > 0 && (
-            <div className="mt-3 pt-3 border-t border-gray-600">
-                <h4 className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1.5">
-                    <SourcesIcon />
-                    Sources
-                </h4>
-                <ul className="space-y-1.5 text-xs">
-                    {message.groundingChunks.filter(c => c.web).map((chunk, index) => (
-                        <li key={index}>
-                            <a
-                                href={chunk.web!.uri}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors group"
-                                title={chunk.web!.uri}
-                            >
-                                <div className="flex-shrink-0 w-4 h-4 rounded-sm border border-gray-500/50 group-hover:border-cyan-400/50 flex items-center justify-center text-gray-500 group-hover:text-cyan-400 transition-colors">
-                                    <span className="text-[10px] font-bold">{index + 1}</span>
-                                </div>
-                                <span className="truncate group-hover:underline">
-                                    {chunk.web!.title || new URL(chunk.web!.uri).hostname}
-                                </span>
-                            </a>
-                        </li>
-                    ))}
-                </ul>
+            <div className="mt-2 flex flex-wrap gap-2">
+                 {message.groundingChunks.filter(c => c.web).map((chunk, index) => (
+                    <a
+                        key={index}
+                        href={chunk.web!.uri}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-900/50 border border-gray-800 rounded-full text-xs text-gray-400 hover:text-cyan-400 hover:border-cyan-500/30 transition-all"
+                    >
+                        <SourcesIcon />
+                        <span className="truncate max-w-[200px]">{chunk.web!.title}</span>
+                    </a>
+                ))}
             </div>
         )}
       </div>
-      {isUser && (
-        <div className="w-8 h-8 flex-shrink-0 bg-gray-600 rounded-full flex items-center justify-center">
-          <UserIcon />
-        </div>
-      )}
     </div>
   );
 };

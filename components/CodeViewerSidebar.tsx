@@ -2,10 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import type { UnpackedFile } from '../tools/functionsTools';
 import { CloseIcon, CopyIcon, FileIcon, CheckIcon, CodeIcon, LoadingSpinnerIcon, FolderIcon, FileAddIcon, FolderAddIcon, EditIcon, DeleteIcon, ChevronDownIcon, ChevronUpIcon } from './Icons';
 
-// =================================================================
-// Types and Helpers for File Tree
-// =================================================================
-
 interface TreeNode {
     name: string;
     path: string;
@@ -15,17 +11,12 @@ interface TreeNode {
 
 const buildFileTree = (files: UnpackedFile[]): TreeNode => {
     const root: TreeNode = { name: 'root', path: '', type: 'folder', children: {} };
-
     for (const file of files) {
         const parts = file.name.split('/');
         let currentNode = root;
-
         for (let i = 0; i < parts.length; i++) {
             const part = parts[i];
-            if (!currentNode.children) {
-                currentNode.children = {};
-            }
-
+            if (!currentNode.children) currentNode.children = {};
             if (!currentNode.children[part]) {
                 const isFile = i === parts.length - 1;
                 currentNode.children[part] = {
@@ -40,11 +31,6 @@ const buildFileTree = (files: UnpackedFile[]): TreeNode => {
     }
     return root;
 };
-
-
-// =================================================================
-// Sub-Components
-// =================================================================
 
 interface FileTreeItemProps {
     node: TreeNode;
@@ -94,37 +80,25 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({ node, level, activeFilePath
     const handleCreateSubmit = (newName: string) => {
         if (newName && isCreating) {
             const newPath = node.path ? `${node.path}/${newName}` : newName;
-            if (isCreating === 'file') {
-                onFileAdd(newPath);
-            } else { // folder
-                // Creating a folder is implicit when a file is added to its path.
-                // Here, we can add a placeholder file to make the folder appear.
-                // An improved implementation might handle "empty" folders differently.
-                onFileAdd(`${newPath}/.gitkeep`);
-            }
+            if (isCreating === 'file') onFileAdd(newPath);
+            else onFileAdd(`${newPath}/.gitkeep`);
         }
         setIsCreating(null);
     };
 
-
     const renderInput = (defaultValue: string, onConfirm: (value: string) => void) => (
-        <div className="pl-4" style={{ paddingLeft: `${level * 1 + 1}rem`}}>
-            <div className="flex items-center gap-1.5 py-1">
-                 {isCreating === 'folder' || node.type === 'folder' ? <FolderIcon /> : <FileIcon size={16} />}
+        <div className="pl-4 pr-2 py-1" style={{ paddingLeft: `${level * 12 + 20}px`}}>
+            <div className="flex items-center gap-1.5">
+                 {isCreating === 'folder' || node.type === 'folder' ? <FolderIcon size={14} /> : <FileIcon size={14} />}
                 <input
                     ref={inputRef}
                     type="text"
                     defaultValue={defaultValue}
-                    className="w-full bg-gray-600 text-gray-100 text-sm p-0.5 rounded-sm outline-none focus:ring-1 focus:ring-cyan-500"
+                    className="w-full bg-gray-700 text-gray-100 text-xs p-1 rounded border border-cyan-500/50 outline-none"
                     onBlur={(e) => onConfirm(e.target.value)}
                     onKeyDown={(e) => { 
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                            onConfirm(e.currentTarget.value);
-                        } else if (e.key === 'Escape') {
-                            setIsRenaming(false); 
-                            setIsCreating(null);
-                        } 
+                        if (e.key === 'Enter') { e.preventDefault(); onConfirm(e.currentTarget.value); } 
+                        else if (e.key === 'Escape') { setIsRenaming(false); setIsCreating(null); } 
                     }}
                     onClick={(e) => e.stopPropagation()}
                 />
@@ -132,10 +106,7 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({ node, level, activeFilePath
         </div>
     );
     
-    if (isRenaming) {
-        return renderInput(node.name, handleRenameSubmit);
-    }
-
+    if (isRenaming) return renderInput(node.name, handleRenameSubmit);
 
     const children = node.children ? Object.values(node.children).sort((a: TreeNode, b: TreeNode) => {
         if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
@@ -145,32 +116,31 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({ node, level, activeFilePath
     return (
         <div>
             <div
-                className={`group flex items-center justify-between gap-1 p-1 rounded-md transition-colors text-sm ${activeFilePath === node.path ? 'bg-purple-600/20' : 'hover:bg-gray-700/60'}`}
-                style={{ paddingLeft: `${level * 1}rem` }}
+                className={`group flex items-center justify-between px-2 py-1 cursor-pointer border-l-2 border-transparent hover:bg-gray-800 ${activeFilePath === node.path ? 'bg-gray-800/80 border-purple-500 text-white' : 'text-gray-400'}`}
+                style={{ paddingLeft: `${level * 12 + 12}px` }}
+                onClick={() => {
+                    if (node.type === 'file') onFileSelect(node.path);
+                    if (node.type === 'folder') setIsExpanded(!isExpanded);
+                }}
             >
-                <div 
-                    className="flex items-center gap-1.5 flex-1 cursor-pointer truncate" 
-                    onClick={() => {
-                        if (node.type === 'file') onFileSelect(node.path);
-                        if (node.type === 'folder') setIsExpanded(!isExpanded);
-                    }}
-                >
-                    {node.type === 'folder' ? (
-                        <>
-                            {isExpanded ? <ChevronDownIcon size={16} /> : <ChevronUpIcon size={16} />}
-                            <FolderIcon />
-                        </>
-                    ) : <FileIcon size={16} />}
-                    <span className="truncate">{node.name}</span>
-                    {hasChanged && <span className="ml-1 w-1.5 h-1.5 bg-cyan-400 rounded-full" title="Unsaved changes"></span>}
+                <div className="flex items-center gap-2 truncate">
+                    {node.type === 'folder' && (
+                        <span className={`text-gray-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                           <ChevronDownIcon size={10} /> {/* Using ChevronRight logic roughly */}
+                        </span>
+                    )}
+                    {node.type === 'folder' ? <FolderIcon size={14} className="text-blue-400" /> : <FileIcon size={14} className="text-gray-300" />}
+                    <span className="text-xs truncate font-medium">{node.name}</span>
+                    {hasChanged && <span className="w-2 h-2 bg-yellow-500 rounded-full ml-1 shadow-sm" title="Unsaved changes"></span>}
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {node.type === 'folder' && <>
-                        <button onClick={(e) => { e.stopPropagation(); setIsCreating('file'); }} className="p-0.5 rounded hover:bg-gray-600" title="New File"><FileAddIcon size={16} /></button>
-                        <button onClick={(e) => { e.stopPropagation(); setIsCreating('folder'); }} className="p-0.5 rounded hover:bg-gray-600" title="New Folder"><FolderAddIcon size={16} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); setIsCreating('file'); }} className="text-gray-500 hover:text-gray-200" title="New File"><FileAddIcon size={12} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); setIsCreating('folder'); }} className="text-gray-500 hover:text-gray-200" title="New Folder"><FolderAddIcon size={12} /></button>
                     </>}
-                    <button onClick={(e) => { e.stopPropagation(); setIsRenaming(true); }} className="p-0.5 rounded hover:bg-gray-600" title="Rename"><EditIcon size={16} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); onFileDelete(node.path, node.type); }} className="p-0.5 rounded hover:bg-gray-600" title="Delete"><DeleteIcon /></button>
+                    <button onClick={(e) => { e.stopPropagation(); setIsRenaming(true); }} className="text-gray-500 hover:text-gray-200" title="Rename"><EditIcon size={12} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); onFileDelete(node.path, node.type); }} className="text-gray-500 hover:text-red-400" title="Delete"><DeleteIcon size={12} /></button>
                 </div>
             </div>
             
@@ -198,11 +168,6 @@ const FileTreeItem: React.FC<FileTreeItemProps> = ({ node, level, activeFilePath
     );
 };
 
-
-// =================================================================
-// Main Component
-// =================================================================
-
 interface CodeViewerSidebarProps {
     isOpen: boolean;
     onClose: () => void;
@@ -219,148 +184,102 @@ interface CodeViewerSidebarProps {
 }
 
 export const CodeViewerSidebar: React.FC<CodeViewerSidebarProps> = ({ 
-    isOpen, 
-    onClose, 
-    files, 
-    originalFiles,
-    functionName, 
-    onFileContentChange, 
-    onDeploy, 
-    isDeploying,
-    hasUnsavedChanges,
-    onFileAdd,
-    onFileDelete,
-    onFileRename
+    isOpen, onClose, files, originalFiles, functionName, onFileContentChange, onDeploy, isDeploying, hasUnsavedChanges, onFileAdd, onFileDelete, onFileRename
 }) => {
     const [activeFilePath, setActiveFilePath] = useState<string | null>(null);
     const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
     useEffect(() => {
-        // When the function or its base files change, select the first file as the default view.
-        // We use `originalFiles` as a dependency because it doesn't change on every keystroke in the editor,
-        // which was causing the active file to reset while typing.
         if (originalFiles.length > 0) {
             const firstFile = originalFiles.find(f => f.name.endsWith('.js') || f.name.endsWith('.ts')) || originalFiles[0];
             setActiveFilePath(firstFile.name);
         } else {
             setActiveFilePath(null);
         }
-        // We also depend on functionName to ensure this runs if the function changes but files are momentarily the same.
     }, [originalFiles, functionName]);
-
-    useEffect(() => {
-        if (isOpen) document.body.style.overflow = 'hidden';
-        else document.body.style.overflow = '';
-        return () => { document.body.style.overflow = ''; };
-    }, [isOpen]);
 
     const fileTree = useMemo(() => buildFileTree(files), [files]);
     const activeFile = useMemo(() => files.find(f => f.name === activeFilePath), [files, activeFilePath]);
+    const rootNode = buildFileTree(files);
 
     const handleCopy = () => {
         if (!activeFile) return;
         navigator.clipboard.writeText(activeFile.content).then(() => {
-            setCopyStatus('Copied!');
-            setTimeout(() => setCopyStatus(null), 2000);
-        }, (err) => {
-            setCopyStatus('Failed!');
-            console.error('Could not copy text: ', err);
+            setCopyStatus('Copied');
             setTimeout(() => setCopyStatus(null), 2000);
         });
     };
 
-    const handleFileContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        if (!activeFile) return;
-        onFileContentChange(activeFile.name, e.target.value);
-    };
-    
-    const rootNode = buildFileTree(files);
-
     return (
         <>
-            <div
-                className={`fixed inset-0 bg-black/60 z-30 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                onClick={onClose}
-                aria-hidden="true"
-            />
-            <aside
-                className={`fixed inset-y-0 right-0 z-40 bg-gray-800/90 backdrop-blur-sm text-gray-300 flex flex-col border-l border-gray-700 transition-transform duration-300 ease-in-out w-full max-w-4xl transform ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
-                aria-labelledby="code-viewer-sidebar-title"
-            >
-                <div className="flex flex-col h-full">
-                    <header className="p-4 border-b border-gray-700 shadow-md bg-gray-900/50 flex justify-between items-center flex-shrink-0">
-                        <div className="flex items-center gap-3">
-                            <CodeIcon />
-                            <h2 id="code-viewer-sidebar-title" className="text-lg font-bold text-purple-300">
-                                Code: <span className="font-mono text-purple-200">{functionName}</span>
-                            </h2>
+            <div className={`fixed inset-0 bg-black/60 z-30 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} />
+            <aside className={`fixed inset-y-0 right-0 z-40 bg-gray-900 shadow-2xl flex flex-col border-l border-gray-800 w-full max-w-5xl transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                
+                {/* Toolbar */}
+                <div className="h-14 px-4 bg-gray-900 border-b border-gray-800 flex justify-between items-center flex-shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-purple-900/20 p-2 rounded-lg text-purple-400"><CodeIcon /></div>
+                        <div>
+                            <h2 className="text-sm font-bold text-gray-200 leading-none">{functionName}</h2>
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Workspace</span>
                         </div>
-                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={onDeploy}
-                                disabled={!hasUnsavedChanges || isDeploying || files.length === 0}
-                                className="flex items-center justify-center gap-2 px-4 py-2 w-24 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isDeploying ? <LoadingSpinnerIcon /> : 'Deploy'}
-                            </button>
-                            <button onClick={onClose} className="p-1 rounded-full text-gray-400 hover:text-white hover:bg-gray-600" aria-label="Close code viewer">
-                                <CloseIcon />
-                            </button>
-                        </div>
-                    </header>
-                    
-                    <div className="flex flex-1 min-h-0">
-                        {/* File Explorer Pane */}
-                        <div className="w-64 flex-shrink-0 bg-gray-800/50 border-r border-gray-700 flex flex-col">
-                            <div className="flex-1 overflow-y-auto p-2">
-                                {rootNode.children && Object.keys(rootNode.children).length > 0 ? (
-                                    <FileTreeItem
-                                        node={rootNode}
-                                        level={0}
-                                        activeFilePath={activeFilePath}
-                                        onFileSelect={setActiveFilePath}
-                                        originalFiles={originalFiles}
-                                        editedFiles={files}
-                                        onFileAdd={onFileAdd}
-                                        onFileDelete={onFileDelete}
-                                        onFileRename={onFileRename}
-                                    />
-                                ) : (
-                                    <div className="text-center text-sm text-gray-400 p-4">
-                                        <p>No files in this function.</p>
-                                        <button onClick={() => onFileAdd('index.js')} className="mt-2 text-cyan-400 hover:underline">Create index.js</button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Editor Pane */}
-                        <div className="relative flex-1 min-h-0 bg-gray-900/70">
-                            {activeFile ? (
-                                <>
-                                    <div className="absolute top-2 right-2 z-10">
-                                        <button
-                                            onClick={handleCopy}
-                                            className="flex items-center gap-1.5 px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-md text-xs font-semibold transition-all"
-                                        >
-                                            {copyStatus === 'Copied!' ? <CheckIcon /> : <CopyIcon />}
-                                            {copyStatus || 'Copy'}
-                                        </button>
-                                    </div>
-                                    <textarea
-                                        value={activeFile.content}
-                                        onChange={handleFileContentChange}
-                                        className="w-full h-full p-4 bg-transparent text-sm text-gray-200 font-mono whitespace-pre resize-none focus:outline-none"
-                                        spellCheck="false"
-                                        aria-label={`Code editor for ${activeFile.name}`}
-                                    />
-                                </>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button onClick={onDeploy} disabled={!hasUnsavedChanges || isDeploying || files.length === 0} className="flex items-center gap-2 px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-semibold transition-colors disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed">
+                            {isDeploying ? <LoadingSpinnerIcon /> : 'Deploy Changes'}
+                        </button>
+                        <button onClick={onClose} className="p-2 text-gray-500 hover:text-white rounded hover:bg-gray-800 transition-colors"><CloseIcon /></button>
+                    </div>
+                </div>
+                
+                <div className="flex flex-1 min-h-0">
+                    {/* Sidebar */}
+                    <div className="w-64 flex-shrink-0 bg-gray-900 border-r border-gray-800 flex flex-col">
+                        <div className="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Explorer</div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            {rootNode.children && Object.keys(rootNode.children).length > 0 ? (
+                                <FileTreeItem
+                                    node={rootNode} level={0} activeFilePath={activeFilePath} onFileSelect={setActiveFilePath}
+                                    originalFiles={originalFiles} editedFiles={files}
+                                    onFileAdd={onFileAdd} onFileDelete={onFileDelete} onFileRename={onFileRename}
+                                />
                             ) : (
-                                <div className="flex items-center justify-center h-full text-gray-500">
-                                    {files.length > 0 ? 'Select a file to view its content' : 'Create a file to start coding'}
+                                <div className="flex flex-col items-center justify-center h-32 text-gray-600 gap-2">
+                                    <span className="text-xs">Empty Workspace</span>
+                                    <button onClick={() => onFileAdd('index.js')} className="text-xs text-purple-400 hover:underline">Create File</button>
                                 </div>
                             )}
                         </div>
+                    </div>
+
+                    {/* Editor */}
+                    <div className="flex-1 flex flex-col min-w-0 bg-[#0d1117]">
+                        {activeFile ? (
+                            <>
+                                <div className="flex items-center justify-between px-4 py-2 bg-[#0d1117] border-b border-gray-800">
+                                    <span className="text-xs text-gray-400 font-mono">{activeFile.name}</span>
+                                    <button onClick={handleCopy} className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1">
+                                        {copyStatus === 'Copied' ? <CheckIcon /> : <CopyIcon />} {copyStatus || 'Copy'}
+                                    </button>
+                                </div>
+                                <div className="relative flex-1 overflow-hidden">
+                                    <textarea
+                                        value={activeFile.content}
+                                        onChange={(e) => onFileContentChange(activeFile.name, e.target.value)}
+                                        className="absolute inset-0 w-full h-full p-4 bg-[#0d1117] text-gray-300 font-mono text-sm resize-none focus:outline-none leading-6 custom-scrollbar"
+                                        spellCheck="false"
+                                        style={{ tabSize: 2 }}
+                                    />
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-gray-600">
+                                <div className="text-center">
+                                    <CodeIcon size={48} className="mx-auto mb-2 opacity-20" />
+                                    <p className="text-sm">Select a file to edit</p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </aside>

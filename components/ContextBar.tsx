@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Database, Collection, Bucket, AppwriteFunction } from '../types';
-import { LoadingSpinnerIcon, RefreshIcon } from './Icons';
+import { LoadingSpinnerIcon, RefreshIcon, ChevronDownIcon } from './Icons';
 
 interface ContextBarProps {
     databases: Database[];
@@ -26,20 +26,18 @@ interface SelectorProps {
     options: { $id: string; name: string }[];
     placeholder: string;
     disabled?: boolean;
-    'aria-label': string;
 }
 
-const Selector: React.FC<SelectorProps> = ({ label, value, onChange, options, placeholder, disabled = false, 'aria-label': ariaLabel }) => {
+const Selector: React.FC<SelectorProps> = ({ label, value, onChange, options, placeholder, disabled = false }) => {
     return (
-        <div className="flex-1 min-w-48">
-            <label htmlFor={label} className="sr-only">{label}</label>
+        <div className="relative min-w-[160px] max-w-[200px] flex-1">
+            <label htmlFor={label} className="sr-only">{placeholder}</label>
             <select
                 id={label}
                 value={value}
                 onChange={onChange}
                 disabled={disabled}
-                aria-label={ariaLabel}
-                className="w-full bg-gray-700 border border-gray-600 px-2 py-1.5 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm disabled:opacity-50 disabled:cursor-not-allowed text-gray-200"
+                className="w-full appearance-none bg-gray-800/50 hover:bg-gray-800 border border-white/5 hover:border-white/10 rounded-lg py-1.5 pl-3 pr-8 text-xs text-gray-300 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition-colors disabled:opacity-50 truncate cursor-pointer"
             >
                 <option value="">{placeholder}</option>
                 {options.map(opt => (
@@ -48,6 +46,9 @@ const Selector: React.FC<SelectorProps> = ({ label, value, onChange, options, pl
                     </option>
                 ))}
             </select>
+            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
+                <ChevronDownIcon size={12} />
+            </div>
         </div>
     );
 };
@@ -90,36 +91,36 @@ export const ContextBar: React.FC<ContextBarProps> = ({
     };
 
     return (
-        <div className="p-2 border-b border-gray-700 bg-gray-800/60 flex-shrink-0 shadow-inner">
-            <div className="flex items-center gap-2 md:gap-4 flex-wrap max-w-6xl mx-auto px-2">
-                <div className="flex items-center gap-2 text-sm font-semibold text-gray-400 flex-shrink-0">
-                    <span>Context:</span>
+        <div className="w-full border-b border-white/5 bg-gray-900/40 backdrop-blur-sm sticky top-0 z-10">
+            <div className="max-w-7xl mx-auto px-4 py-2 flex items-center gap-3 overflow-x-auto custom-scrollbar">
+                <div className="flex items-center gap-2 text-xs font-medium text-gray-500 mr-1 flex-shrink-0">
                     <button
                         onClick={onRefresh}
                         disabled={isLoading}
-                        className="p-1 rounded-full text-gray-400 hover:text-cyan-300 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-wait flex items-center justify-center w-6 h-6"
-                        aria-label="Refresh context data"
-                        title="Refresh context data"
+                        className="p-1.5 rounded-md hover:bg-gray-700/50 hover:text-cyan-400 transition-colors disabled:animate-spin"
+                        title="Refresh Data"
                     >
-                        {isLoading ? <LoadingSpinnerIcon /> : <RefreshIcon size={16} />}
+                        {isLoading ? <LoadingSpinnerIcon /> : <RefreshIcon size={14} />}
                     </button>
                 </div>
+                
+                <div className="h-4 w-px bg-gray-700/50 flex-shrink-0"></div>
 
                 <Selector
-                    label="database-selector" aria-label="Select Database" value={selectedDatabase?.$id || ''}
-                    onChange={handleDbChange} options={databases} placeholder="Select a Database..." disabled={isLoading}
+                    label="database-select" value={selectedDatabase?.$id || ''}
+                    onChange={handleDbChange} options={databases} placeholder="Database" disabled={isLoading}
                 />
                 <Selector
-                    label="collection-selector" aria-label="Select Collection" value={selectedCollection?.$id || ''}
-                    onChange={handleCollectionChange} options={collections} placeholder="Select a Collection..." disabled={isLoading || !selectedDatabase}
+                    label="collection-select" value={selectedCollection?.$id || ''}
+                    onChange={handleCollectionChange} options={collections} placeholder="Collection" disabled={isLoading || !selectedDatabase}
                 />
                 <Selector
-                    label="bucket-selector" aria-label="Select Bucket" value={selectedBucket?.$id || ''}
-                    onChange={handleBucketChange} options={buckets} placeholder="Select a Bucket..." disabled={isLoading}
+                    label="bucket-select" value={selectedBucket?.$id || ''}
+                    onChange={handleBucketChange} options={buckets} placeholder="Storage Bucket" disabled={isLoading}
                 />
                 <Selector
-                    label="function-selector" aria-label="Select Function" value={selectedFunction?.$id || ''}
-                    onChange={handleFunctionChange} options={functions} placeholder="Select a Function..." disabled={isLoading}
+                    label="function-select" value={selectedFunction?.$id || ''}
+                    onChange={handleFunctionChange} options={functions} placeholder="Function" disabled={isLoading}
                 />
             </div>
         </div>
