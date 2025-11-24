@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { Models } from 'appwrite';
-import type { UserPrefs, AppwriteProject, ModelMessage, StudioTab } from '../types';
+import type { UserPrefs, AppwriteProject, ModelMessage, StudioTab, AppwriteFunction } from '../types';
 import { getSdkFunctions } from '../services/appwrite';
 
 // Custom Hooks
@@ -64,7 +64,7 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
     }, []);
 
     const {
-        projects, activeProject, handleSaveProject, handleDeleteProject, handleSelectProject,
+        projects, activeProject, handleSaveProject, handleUpdateProject, handleDeleteProject, handleSelectProject,
         error: projectError, setError: setProjectError
     } = useProjects(currentUser, refreshUser, logCallback);
 
@@ -184,7 +184,7 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
         try {
             const sdkFunctions = getSdkFunctions(activeProject);
             const newFunc = await sdkFunctions.get(functionId);
-            setSelectedFunction(newFunc);
+            setSelectedFunction(newFunc as unknown as AppwriteFunction);
             setIsCodeViewerSidebarOpen(true);
             logCallback(`Function "${newFunc.name}" created and selected.`);
         } catch (e) {
@@ -202,7 +202,8 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
              <LeftSidebar
                 isOpen={isLeftSidebarOpen} onClose={() => setIsLeftSidebarOpen(false)}
                 projects={projects} activeProject={activeProject} onSave={handleSaveProject}
-                onDelete={requestProjectDeletion} onSelect={(p: AppwriteProject) => { handleSelectProject(p); if (window.innerWidth < 768) { setIsLeftSidebarOpen(false); } }}
+                onDelete={requestProjectDeletion} onEdit={handleUpdateProject} 
+                onSelect={(p: AppwriteProject) => { handleSelectProject(p); if (window.innerWidth < 768) { setIsLeftSidebarOpen(false); } }}
                 activeTools={activeTools} onToolsChange={handleToolsChange}
                 geminiApiKey={geminiApiKey} geminiModel={geminiModel} geminiModels={GEMINI_MODELS}
                 geminiThinkingEnabled={geminiThinkingEnabled} onSaveGeminiSettings={handleSaveGeminiSettings}

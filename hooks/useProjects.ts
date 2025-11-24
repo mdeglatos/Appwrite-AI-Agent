@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import type { Models } from 'appwrite';
 import type { AppwriteProject, UserPrefs } from '../types';
@@ -59,6 +60,24 @@ export function useProjects(
         }
     }, [currentUser, logCallback, refreshUser]);
 
+    const handleUpdateProject = useCallback(async (project: AppwriteProject) => {
+        try {
+            const { $id, name, endpoint, projectId, apiKey } = project;
+            const projectData: NewAppwriteProject = { name, endpoint, projectId, apiKey };
+            const updatedProject = await projectService.updateProject($id, projectData);
+            
+            setProjects(prevProjects => prevProjects.map(p => p.$id === $id ? updatedProject : p));
+            
+            if (activeProject?.$id === $id) {
+                setActiveProject(updatedProject);
+            }
+        } catch (e) {
+            const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+            setError(`Failed to update project: ${errorMessage}`);
+            logCallback(`ERROR updating project: ${errorMessage}`);
+        }
+    }, [activeProject, logCallback]);
+
     const handleDeleteProject = useCallback(async (projectId: string) => {
         try {
             await projectService.deleteProject(projectId);
@@ -94,6 +113,7 @@ export function useProjects(
         activeProject,
         setActiveProject,
         handleSaveProject,
+        handleUpdateProject,
         handleDeleteProject,
         handleSelectProject,
         isLoading,

@@ -3,7 +3,7 @@ import React from 'react';
 import { IoSend, IoAttach } from 'react-icons/io5';
 import { CgSpinner } from 'react-icons/cg';
 import { FaUser } from 'react-icons/fa';
-import { RiRobot2Line, RiSettings3Line, RiAddCircleLine, RiDeleteBinLine, RiCheckLine, RiCloseLine, RiTerminalBoxLine, RiMenuLine, RiToolsLine, RiLogoutBoxRLine, RiArrowDownSLine, RiArrowUpSLine, RiStackLine, RiFileUploadFill, RiFile3Line, RiKey2Line, RiRefreshLine, RiFileCopyLine, RiCodeSSlashLine, RiCompass3Line, RiErrorWarningLine, RiFolderLine, RiFileAddLine, RiFolderAddLine, RiPencilLine, RiLayoutMasonryLine, RiDatabase2Line, RiHardDrive2Line, RiGroupLine, RiFlashlightLine, RiDashboardLine, RiArrowLeftSLine } from 'react-icons/ri';
+import { RiRobot2Line, RiSettings3Line, RiAddCircleLine, RiDeleteBinLine, RiCheckLine, RiCloseLine, RiTerminalBoxLine, RiMenuLine, RiToolsLine, RiLogoutBoxRLine, RiArrowDownSLine, RiArrowUpSLine, RiStackLine, RiFileUploadFill, RiFile3Line, RiKey2Line, RiRefreshLine, RiFileCopyLine, RiCodeSSlashLine, RiCompass3Line, RiErrorWarningLine, RiFolderLine, RiFileAddLine, RiFolderAddLine, RiPencilLine, RiLayoutMasonryLine, RiDatabase2Line, RiHardDrive2Line, RiGroupLine, RiFlashlightLine, RiDashboardLine, RiArrowLeftSLine, RiEyeLine } from 'react-icons/ri';
 
 interface IconProps {
     size?: number;
@@ -45,6 +45,7 @@ export const CopyIcon: React.FC<IconProps> = ({ size = 16, className }) => <RiFi
 export const CodeIcon: React.FC<IconProps> = ({ size = 20, className }) => <RiCodeSSlashLine size={size} className={className} />;
 export const SourcesIcon: React.FC<IconProps> = ({ size = 16, className }) => <RiCompass3Line size={size} className={className} />;
 export const WarningIcon: React.FC<IconProps> = ({ size = 24, className }) => <RiErrorWarningLine size={size} className={`text-red-400 ${className || ''}`} />;
+export const EyeIcon: React.FC<IconProps> = ({ size = 18, className }) => <RiEyeLine size={size} className={className} />;
 
 // New Icons for Code Viewer
 export const FolderIcon: React.FC<IconProps> = ({ size = 16, className }) => <RiFolderLine size={size} className={className} />;

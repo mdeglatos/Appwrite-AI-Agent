@@ -1,17 +1,43 @@
 
-import React, { useState, useEffect } from 'react';
-import { ID, Query, Permission, Role } from '../services/appwrite';
+import React, { useState, useEffect, useRef } from 'react';
+import { ID, Query } from '../services/appwrite';
 import { getSdkDatabases, getSdkStorage, getSdkFunctions, getSdkUsers, getSdkTeams } from '../services/appwrite';
 import type { AppwriteProject, Database, Bucket, AppwriteFunction, StudioTab } from '../types';
 import type { Models } from 'node-appwrite';
 import { Modal } from './Modal';
-import { 
-    DatabaseIcon, StorageIcon, FunctionIcon, TeamIcon,
-    AddIcon, DeleteIcon, LoadingSpinnerIcon,
-    ArrowLeftIcon, FileIcon, CodeIcon, TerminalIcon,
-    EditIcon, SettingsIcon, ChevronDownIcon, CheckIcon, UserIcon,
-    KeyIcon, WarningIcon, DashboardIcon
-} from './Icons';
+import { LoadingSpinnerIcon, ChevronDownIcon, CopyIcon, CheckIcon } from './Icons';
+import type { ModalState, FormField } from './studio/types';
+
+// Tab Components
+import { StudioNavBar } from './studio/ui/StudioNavBar';
+import { OverviewTab } from './studio/tabs/OverviewTab';
+import { DatabasesTab } from './studio/tabs/DatabasesTab';
+import { StorageTab } from './studio/tabs/StorageTab';
+import { FunctionsTab } from './studio/tabs/FunctionsTab';
+import { UsersTab } from './studio/tabs/UsersTab';
+import { TeamsTab } from './studio/tabs/TeamsTab';
+
+const CopyButton: React.FC<{ text: string }> = ({ text }) => {
+    const [copied, setCopied] = useState(false);
+    
+    const handleCopy = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(text).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
+
+    return (
+        <button 
+            onClick={handleCopy} 
+            className="text-[10px] text-gray-400 hover:text-white flex items-center gap-1 bg-gray-800 px-2 py-1 rounded border border-gray-700 hover:bg-gray-700 transition-colors"
+            title="Copy to clipboard"
+        >
+            {copied ? <CheckIcon size={10} /> : <CopyIcon size={10} />} {copied ? 'Copied' : 'Copy'}
+        </button>
+    );
+};
 
 interface StudioProps {
     activeProject: AppwriteProject;
@@ -23,159 +49,6 @@ interface StudioProps {
     activeTab: StudioTab;
     onTabChange: (tab: StudioTab) => void;
 }
-
-// -- Modal Types --
-type ModalType = 'confirm' | 'form';
-interface FormField {
-    name: string;
-    label: string;
-    type?: 'text' | 'password' | 'number' | 'email' | 'textarea' | 'select' | 'checkbox';
-    placeholder?: string;
-    defaultValue?: string | boolean | number;
-    options?: { label: string; value: string }[];
-    required?: boolean;
-    description?: string;
-}
-
-interface ModalState {
-    isOpen: boolean;
-    type: ModalType;
-    title: string;
-    message?: string; // For confirmation
-    fields?: FormField[]; // For forms
-    confirmLabel?: string;
-    confirmClass?: string;
-    onConfirm: (formData: any) => Promise<void> | void;
-}
-
-type CollectionTab = 'documents' | 'attributes' | 'indexes' | 'settings';
-
-// -- Components --
-
-const StatCard = ({ title, value, icon, color, onClick, description }: { title: string, value: string | number, icon: React.ReactNode, color: string, onClick?: () => void, description?: string }) => (
-    <div
-        onClick={onClick}
-        className={`relative overflow-hidden bg-gray-800/40 border border-gray-700/50 rounded-2xl p-6 flex flex-col justify-between min-h-[140px] transition-all duration-300 ${onClick ? 'cursor-pointer hover:bg-gray-800/60 hover:border-gray-600 hover:shadow-xl hover:shadow-black/20 hover:-translate-y-1 group' : ''}`}
-    >
-        <div className={`absolute top-0 right-0 p-24 rounded-full blur-3xl opacity-5 transition-opacity duration-300 group-hover:opacity-10 ${color.replace('text-', 'bg-')}`}></div>
-
-        <div className="flex justify-between items-start z-10">
-            <div className={`p-3 rounded-xl bg-gray-900/80 backdrop-blur-sm ${color} shadow-lg transition-transform duration-300 group-hover:scale-110`}>
-                {icon}
-            </div>
-             {onClick && (
-                <div className="text-gray-600 group-hover:text-gray-300 transition-colors transform rotate-180">
-                     <ArrowLeftIcon size={20} />
-                </div>
-            )}
-        </div>
-
-        <div className="mt-4 z-10">
-             <h3 className="text-3xl font-bold text-gray-100 mb-1 tracking-tight">{value}</h3>
-             <p className="text-sm font-medium text-gray-400 group-hover:text-gray-300 transition-colors">{title}</p>
-             {description && <p className="text-xs text-gray-600 mt-1">{description}</p>}
-        </div>
-    </div>
-);
-
-const ResourceTable = <T extends { $id: string } & Partial<{ name: string, key: string }>>({ 
-    title, 
-    data, 
-    onDelete, 
-    onEdit,
-    onCreate, 
-    onSelect,
-    createLabel = "Create",
-    renderName,
-    renderExtra,
-    headers = ['ID', 'Name / Key', 'Details', 'Actions'],
-    extraActions
-}: { 
-    title?: string, 
-    data: T[], 
-    onDelete?: (item: T) => void, 
-    onEdit?: (item: T) => void,
-    onCreate?: () => void, 
-    onSelect?: (item: T) => void,
-    createLabel?: string,
-    renderName?: (item: T) => React.ReactNode,
-    renderExtra?: (item: T) => React.ReactNode,
-    headers?: string[],
-    extraActions?: React.ReactNode
-}) => {
-    return (
-        <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl overflow-hidden animate-fade-in h-full flex flex-col shadow-sm">
-            {(title || onCreate || extraActions) && (
-                <div className="p-4 border-b border-gray-700/50 flex flex-wrap justify-between items-center bg-gray-900/30 gap-3">
-                    {title && <h3 className="text-lg font-semibold text-gray-200">{title}</h3>}
-                    <div className="flex items-center gap-2 ml-auto">
-                        {extraActions}
-                        {onCreate && (
-                            <button onClick={onCreate} className="flex items-center gap-2 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg transition-colors shadow-lg shadow-cyan-900/20">
-                                <AddIcon /> {createLabel}
-                            </button>
-                        )}
-                    </div>
-                </div>
-            )}
-            <div className="overflow-x-auto flex-1 custom-scrollbar">
-                <table className="w-full text-left text-sm text-gray-400">
-                    <thead className="bg-gray-900/50 text-xs uppercase font-semibold text-gray-500 sticky top-0 z-10 backdrop-blur-md">
-                        <tr>
-                            <th className="px-6 py-3">{headers[0]}</th>
-                            <th className="px-6 py-3">{headers[1]}</th>
-                            {renderExtra && <th className="px-6 py-3">{headers[2]}</th>}
-                            {(onDelete || onSelect || onEdit) && <th className="px-6 py-3 text-right">{headers[3]}</th>}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-700/50">
-                        {data.length === 0 ? (
-                            <tr><td colSpan={4} className="px-6 py-12 text-center text-gray-500 italic">No items found.</td></tr>
-                        ) : (
-                            data.map((item) => (
-                                <tr 
-                                    key={item.$id} 
-                                    className={`transition-colors ${onSelect ? 'hover:bg-gray-700/30 cursor-pointer' : 'hover:bg-gray-700/20'}`}
-                                    onClick={() => onSelect && onSelect(item)}
-                                >
-                                    <td className="px-6 py-3 font-mono text-xs text-gray-500 max-w-[150px] truncate" title={item.$id}>{item.$id}</td>
-                                    <td className="px-6 py-3 font-medium text-gray-200">
-                                        {renderName ? renderName(item) : (item.name || item.key || 'Unknown')}
-                                    </td>
-                                    {renderExtra && <td className="px-6 py-3">{renderExtra(item)}</td>}
-                                    {(onDelete || onSelect || onEdit) && (
-                                        <td className="px-6 py-3 text-right" onClick={e => e.stopPropagation()}>
-                                            <div className="flex justify-end gap-1">
-                                                {onEdit && (
-                                                    <button 
-                                                        onClick={() => onEdit(item)}
-                                                        className="text-gray-500 hover:text-cyan-400 p-1.5 rounded hover:bg-gray-800 transition-colors"
-                                                        title="Edit"
-                                                    >
-                                                        <EditIcon />
-                                                    </button>
-                                                )}
-                                                {onDelete && (
-                                                    <button 
-                                                        onClick={() => onDelete(item)}
-                                                        className="text-gray-500 hover:text-red-400 p-1.5 rounded hover:bg-gray-800 transition-colors"
-                                                        title="Delete"
-                                                    >
-                                                        <DeleteIcon />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    )}
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-};
 
 export const Studio: React.FC<StudioProps> = ({ activeProject, databases, buckets, functions, refreshData, onCreateFunction, activeTab, onTabChange }) => {
     const [isLoading, setIsLoading] = useState(false);
@@ -191,9 +64,6 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
     const [selectedFunction, setSelectedFunction] = useState<AppwriteFunction | null>(null);
     const [selectedTeam, setSelectedTeam] = useState<Models.Team<any> | null>(null);
 
-    // -- Collection View State --
-    const [collectionTab, setCollectionTab] = useState<CollectionTab>('documents');
-
     // -- Sub-resource Data States --
     const [collections, setCollections] = useState<Models.Collection[]>([]);
     const [documents, setDocuments] = useState<Models.Document[]>([]);
@@ -202,7 +72,6 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
     const [files, setFiles] = useState<Models.File[]>([]);
     const [deployments, setDeployments] = useState<Models.Deployment[]>([]);
     const [executions, setExecutions] = useState<Models.Execution[]>([]);
-    const [variables, setVariables] = useState<Models.Variable[]>([]);
     const [memberships, setMemberships] = useState<Models.Membership[]>([]);
 
     // -- Modal State --
@@ -210,9 +79,6 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
     const [modalLoading, setModalLoading] = useState(false);
     const [formValues, setFormValues] = useState<any>({});
     
-    // -- Attribute Type Selector State --
-    const [attributeType, setAttributeType] = useState<string>('string');
-
     const closeModal = () => {
         setModal(null);
         setFormValues({});
@@ -264,10 +130,20 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
         setSelectedTeam(null);
     }, [activeTab]);
 
-    // -- Reset Collection Tab when Collection Changes --
+    // -- Real-time Polling for Executions --
     useEffect(() => {
-        setCollectionTab('documents');
-    }, [selectedCollection?.$id]);
+        let interval: ReturnType<typeof setInterval>;
+        if (selectedFunction && activeTab === 'functions') {
+            // Initial Fetch
+            fetchFunctionExecutionsOnly(selectedFunction.$id);
+
+            // Poll every 3 seconds to update executions
+            interval = setInterval(() => {
+                fetchFunctionExecutionsOnly(selectedFunction.$id);
+            }, 3000);
+        }
+        return () => clearInterval(interval);
+    }, [selectedFunction, activeTab]);
 
     // -- Fetchers --
     const fetchUsers = async () => {
@@ -324,15 +200,21 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
         setIsLoading(true);
         try {
             const sdk = getSdkFunctions(activeProject);
-            const [deps, execs, vars] = await Promise.all([
-                sdk.listDeployments(funcId, [Query.limit(20), Query.orderDesc('$createdAt')]),
+            const [deps, execs] = await Promise.all([
+                sdk.listDeployments(funcId, [Query.limit(50), Query.orderDesc('$createdAt')]),
                 sdk.listExecutions(funcId, [Query.limit(20), Query.orderDesc('$createdAt')]),
-                sdk.listVariables(funcId)
             ]);
             setDeployments(deps.deployments);
             setExecutions(execs.executions);
-            setVariables(vars.variables);
         } catch (e) { console.error(e); } finally { setIsLoading(false); }
+    };
+
+    const fetchFunctionExecutionsOnly = async (funcId: string) => {
+        try {
+            const sdk = getSdkFunctions(activeProject);
+            const execs = await sdk.listExecutions(funcId, [Query.limit(20), Query.orderDesc('$createdAt')]);
+            setExecutions(execs.executions);
+        } catch (e) { console.error(e); }
     };
 
     const fetchMemberships = async (teamId: string) => {
@@ -345,23 +227,10 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
     };
 
     // -- Effects --
-    useEffect(() => { 
-        if (activeTab === 'users' || activeTab === 'overview') fetchUsers(); 
-    }, [activeTab]);
-
-    useEffect(() => { 
-        if (activeTab === 'teams' || activeTab === 'overview') fetchTeams(); 
-    }, [activeTab]);
-
+    useEffect(() => { if (activeTab === 'users' || activeTab === 'overview') fetchUsers(); }, [activeTab]);
+    useEffect(() => { if (activeTab === 'teams' || activeTab === 'overview') fetchTeams(); }, [activeTab]);
     useEffect(() => { if (selectedDb) fetchCollections(selectedDb.$id); }, [selectedDb]);
-    
-    // Dependent fetch for collection details
-    useEffect(() => { 
-        if (selectedCollection && selectedDb) {
-            fetchCollectionDetails(selectedDb.$id, selectedCollection.$id); 
-        }
-    }, [selectedCollection?.$id, selectedDb?.$id]);
-
+    useEffect(() => { if (selectedCollection && selectedDb) fetchCollectionDetails(selectedDb.$id, selectedCollection.$id); }, [selectedCollection?.$id, selectedDb?.$id]);
     useEffect(() => { if (selectedBucket) fetchFiles(selectedBucket.$id); }, [selectedBucket]);
     useEffect(() => { if (selectedFunction) fetchFunctionDetails(selectedFunction.$id); }, [selectedFunction]);
     useEffect(() => { if (selectedTeam) fetchMemberships(selectedTeam.$id); }, [selectedTeam]);
@@ -437,13 +306,12 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
                 fetchCollectionDetails(selectedDb.$id, selectedCollection.$id);
             } catch (e) {
                 alert("Invalid JSON format");
-                throw e; // prevent modal close
+                throw e; 
             }
         });
     };
     const handleUpdateDocument = (doc: Models.Document) => {
         if (!selectedDb || !selectedCollection) return;
-        // Strip internal attributes for editing
         const { $id, $collectionId, $databaseId, $createdAt, $updatedAt, $permissions, ...data } = doc;
         const jsonStr = JSON.stringify(data, null, 2);
         const permsStr = $permissions.join(', ');
@@ -456,8 +324,6 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
                 const updatedData = JSON.parse(formData.data);
                 const permsArray = formData.permissions ? formData.permissions.split(',').map((p: string) => p.trim()).filter((p: string) => p) : undefined;
                 const sdk = getSdkDatabases(activeProject);
-                
-                // Update data
                 await sdk.updateDocument(selectedDb.$id, selectedCollection.$id, doc.$id, updatedData, permsArray);
                 fetchCollectionDetails(selectedDb.$id, selectedCollection.$id);
             } catch (e) {
@@ -474,19 +340,17 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
         });
     };
 
-    // Attributes - Specific Handlers
+    // Attributes
     const handleCreateAttribute = (type: string) => {
          if (!selectedDb || !selectedCollection) return;
          const sdk = getSdkDatabases(activeProject);
          const dbId = selectedDb.$id;
          const collId = selectedCollection.$id;
-
          const baseFields: FormField[] = [
              { name: 'key', label: 'Key', required: true },
              { name: 'required', label: 'Required', type: 'checkbox', defaultValue: false },
              { name: 'array', label: 'Array', type: 'checkbox', defaultValue: false },
          ];
-
          switch (type) {
              case 'string':
                  openForm("Create String Attribute", [...baseFields, { name: 'size', label: 'Size', type: 'number', defaultValue: 256, required: true }, { name: 'default', label: 'Default Value' }], async (d) => {
@@ -593,16 +457,8 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
             const maxSize = data.maximumFileSize ? Number(data.maximumFileSize) : undefined;
             
             await getSdkStorage(activeProject).createBucket(
-                id, 
-                data.name, 
-                undefined, // permissions
-                data.fileSecurity, 
-                data.enabled, 
-                maxSize, 
-                exts, 
-                data.compression, 
-                data.encryption, 
-                data.antivirus
+                id, data.name, undefined, data.fileSecurity, data.enabled, 
+                maxSize, exts, data.compression, data.encryption, data.antivirus
             );
             refreshData();
         });
@@ -628,28 +484,182 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
             refreshData();
         });
     };
-    const handleDeleteVariable = (v: Models.Variable) => {
-        if (!selectedFunction) return;
-        confirmAction("Delete Variable", `Delete variable "${v.key}"?`, async () => {
-            await getSdkFunctions(activeProject).deleteVariable(selectedFunction.$id, v.$id);
-            fetchFunctionDetails(selectedFunction.$id);
-        });
-    };
-    const handleCreateVariable = () => {
-        if (!selectedFunction) return;
-        openForm("Add Environment Variable", [
-            { name: 'key', label: 'Key', required: true, placeholder: 'API_KEY' },
-            { name: 'value', label: 'Value', required: true, placeholder: 'secret-value' }
-        ], async (data) => {
-            await getSdkFunctions(activeProject).createVariable(selectedFunction.$id, data.key, data.value);
-            fetchFunctionDetails(selectedFunction.$id);
-        });
-    };
+    
     const handleActivateDeployment = (depId: string) => {
         if (!selectedFunction) return;
         confirmAction("Activate Deployment", "Are you sure you want to activate this deployment?", async () => {
-            await getSdkFunctions(activeProject).updateDeployment(selectedFunction.$id, depId);
+            (getSdkFunctions(activeProject) as any).updateDeployment(selectedFunction.$id, depId);
             fetchFunctionDetails(selectedFunction.$id);
+        });
+    };
+    
+    // New: Bulk Delete Deployments
+    const handleBulkDeleteDeployments = (deploymentIds: string[]) => {
+        if (!selectedFunction) return;
+        confirmAction(
+            "Delete Deployments", 
+            `Are you sure you want to delete ${deploymentIds.length} deployments? This cannot be undone.`, 
+            async () => {
+                const sdk = getSdkFunctions(activeProject);
+                const promises = deploymentIds.map(id => sdk.deleteDeployment(selectedFunction.$id, id));
+                await Promise.all(promises);
+                fetchFunctionDetails(selectedFunction.$id);
+            }
+        );
+    };
+
+    // New Functionality: Delete All Executions
+    const handleDeleteAllExecutions = () => {
+        if (!selectedFunction) return;
+        confirmAction(
+            "Clear Execution History", 
+            `Are you sure you want to delete all executions for function "${selectedFunction.name}"?`, 
+            async () => {
+                const sdk = getSdkFunctions(activeProject);
+                // We delete the currently visible set (pagination would require looping)
+                // This is a bulk delete of what is loaded to keep UI snappy
+                const deletePromises = executions.map(e => sdk.deleteExecution(selectedFunction.$id, e.$id));
+                await Promise.all(deletePromises);
+                fetchFunctionDetails(selectedFunction.$id);
+            }
+        );
+    };
+
+    // Formatted Headers Helper
+    const formatHeaders = (headers: any[]) => {
+        if (!headers || !Array.isArray(headers) || headers.length === 0) return <span className="text-gray-500 italic">No headers</span>;
+        return (
+            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs font-mono">
+                {headers.map((h, i) => (
+                    <React.Fragment key={i}>
+                        <span className="text-gray-400 text-right select-none">{h.name}:</span>
+                        <span className="text-gray-200 break-all">{h.value}</span>
+                    </React.Fragment>
+                ))}
+            </div>
+        );
+    };
+
+    // Updated: View Execution Logs with separated details
+    const handleViewExecution = (exec: Models.Execution) => {
+        const e = exec as any;
+        const logs = e.logs || e.stdout || '';
+        const errors = e.errors || e.stderr || '';
+        const requestMethod = e.requestMethod || 'GET';
+        const requestPath = e.requestPath || '/';
+        const statusCode = e.responseStatusCode || 200;
+        const duration = e.duration || 0;
+        const trigger = e.trigger || 'http';
+
+        setModal({
+            isOpen: true,
+            type: 'custom',
+            title: `Execution Details`,
+            hideCancel: true,
+            confirmLabel: "Close",
+            confirmClass: "bg-gray-700 hover:bg-gray-600",
+            content: (
+                <div className="space-y-6">
+                    {/* Header Stats */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="p-3 bg-gray-900 rounded-lg border border-gray-700">
+                            <span className="block text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Status</span>
+                            <span className={`text-sm font-bold ${e.status === 'completed' ? 'text-green-400' : e.status === 'failed' ? 'text-red-400' : 'text-yellow-400'}`}>
+                                {e.status.toUpperCase()}
+                            </span>
+                        </div>
+                        <div className="p-3 bg-gray-900 rounded-lg border border-gray-700">
+                            <span className="block text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Method</span>
+                            <span className="text-sm font-mono text-purple-300">{requestMethod}</span>
+                        </div>
+                         <div className="p-3 bg-gray-900 rounded-lg border border-gray-700">
+                            <span className="block text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Duration</span>
+                            <span className="text-sm font-mono text-gray-300">{duration.toFixed(3)}s</span>
+                        </div>
+                         <div className="p-3 bg-gray-900 rounded-lg border border-gray-700">
+                            <span className="block text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Status Code</span>
+                            <span className={`text-sm font-mono ${statusCode >= 400 ? 'text-red-400' : 'text-green-400'}`}>{statusCode}</span>
+                        </div>
+                    </div>
+
+                    {/* General Info */}
+                    <div className="bg-gray-900/50 rounded-lg border border-gray-800 p-4 space-y-2 text-xs">
+                         <div className="flex justify-between border-b border-gray-800 pb-2">
+                            <span className="text-gray-500">Execution ID</span>
+                            <span className="font-mono text-gray-300 select-all">{e.$id}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-800 pb-2">
+                            <span className="text-gray-500">Trigger</span>
+                            <span className="text-gray-300 capitalize">{trigger}</span>
+                        </div>
+                         <div className="flex justify-between border-b border-gray-800 pb-2">
+                            <span className="text-gray-500">Created At</span>
+                            <span className="text-gray-300">{new Date(e.$createdAt).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Path</span>
+                            <span className="font-mono text-gray-300 break-all">{requestPath}</span>
+                        </div>
+                    </div>
+
+                    {/* Request Details */}
+                    <div>
+                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Request Headers</h4>
+                        <div className="bg-gray-900/50 rounded-lg border border-gray-800 p-3 max-h-40 overflow-y-auto custom-scrollbar">
+                             {formatHeaders(e.requestHeaders)}
+                        </div>
+                    </div>
+
+                    {/* Response Details */}
+                     <div>
+                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Response</h4>
+                        
+                        <div className="space-y-2">
+                            {/* Response Body */}
+                            <div className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
+                                <div className="bg-gray-800/50 px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase border-b border-gray-800">Body</div>
+                                <div className="p-3 overflow-x-auto max-h-40 custom-scrollbar">
+                                    <pre className="text-xs font-mono text-blue-200 whitespace-pre-wrap">{e.responseBody || '(Empty)'}</pre>
+                                </div>
+                            </div>
+                            
+                            {/* Response Headers */}
+                            <div className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
+                                <div className="bg-gray-800/50 px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase border-b border-gray-800">Headers</div>
+                                <div className="p-3 max-h-40 overflow-y-auto custom-scrollbar">
+                                    {formatHeaders(e.responseHeaders)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Logs & Errors */}
+                    <div className="space-y-4 pt-2 border-t border-gray-800">
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Logs</h4>
+                                {logs && <CopyButton text={logs} />}
+                            </div>
+                            <div className="bg-black/30 rounded-lg border border-gray-800 p-3 overflow-x-auto max-h-48 custom-scrollbar">
+                                <pre className="text-xs font-mono text-gray-300 whitespace-pre-wrap">{logs || <span className="text-gray-600 italic">No logs available</span>}</pre>
+                            </div>
+                        </div>
+
+                        {errors && (
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider">Errors</h4>
+                                    <CopyButton text={errors} />
+                                </div>
+                                <div className="bg-red-950/10 rounded-lg border border-red-900/30 p-3 overflow-x-auto max-h-48 custom-scrollbar">
+                                    <pre className="text-xs font-mono text-red-300 whitespace-pre-wrap">{errors}</pre>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ),
+            onConfirm: () => {} // Just closes
         });
     };
 
@@ -714,154 +724,6 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
         });
     };
 
-    // -- Render Helpers --
-    interface BreadcrumbItem {
-        label: string;
-        onClick?: () => void;
-    }
-
-    const Breadcrumb = ({ items }: { items: BreadcrumbItem[] }) => (
-        <div className="flex items-center gap-2 mb-6 text-sm">
-            {items.map((item, i) => {
-                const isLast = i === items.length - 1;
-                return (
-                    <React.Fragment key={i}>
-                        {item.onClick && !isLast ? (
-                            <button 
-                                onClick={item.onClick} 
-                                className="text-gray-400 hover:text-cyan-400 transition-colors hover:underline flex items-center gap-1"
-                            >
-                                {i === 0 && <ArrowLeftIcon size={14} className="mr-1" />}
-                                {item.label}
-                            </button>
-                        ) : (
-                            <span className={`flex items-center gap-1 ${isLast ? "text-gray-200 font-bold" : "text-gray-400"}`}>
-                                {i === 0 && !item.onClick && <span className="opacity-50"><DashboardIcon size={14} className="mr-1"/></span>}
-                                {item.label}
-                            </span>
-                        )}
-                        {!isLast && <span className="text-gray-600">/</span>}
-                    </React.Fragment>
-                );
-            })}
-        </div>
-    );
-    
-    // -- Navigation Bar --
-    const StudioNavBar = ({ activeTab, onTabChange }: { activeTab: StudioTab, onTabChange: (t: StudioTab) => void }) => {
-        const tabs: { id: StudioTab, label: string, icon: React.ReactNode }[] = [
-            { id: 'overview', label: 'Overview', icon: <DashboardIcon size={16} /> },
-            { id: 'database', label: 'Databases', icon: <DatabaseIcon size={16} /> },
-            { id: 'storage', label: 'Storage', icon: <StorageIcon size={16} /> },
-            { id: 'functions', label: 'Functions', icon: <FunctionIcon size={16} /> },
-            { id: 'users', label: 'Users', icon: <UserIcon size={16} /> },
-            { id: 'teams', label: 'Teams', icon: <TeamIcon size={16} /> },
-        ];
-
-        return (
-            <div className="flex items-center justify-center gap-1 mb-6 p-1 bg-gray-900/50 rounded-xl border border-gray-800/50 w-fit mx-auto sticky top-0 z-20 backdrop-blur-md shadow-xl">
-                {tabs.map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => onTabChange(tab.id)}
-                        className={`
-                            flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200
-                            ${activeTab === tab.id 
-                                ? 'bg-gray-800 text-cyan-400 shadow-sm border border-gray-700/50' 
-                                : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'}
-                        `}
-                    >
-                        {tab.icon}
-                        <span className="hidden sm:inline">{tab.label}</span>
-                    </button>
-                ))}
-            </div>
-        );
-    };
-
-    // -- Settings Form Component for Collection --
-    const CollectionSettings = () => {
-        if(!selectedCollection) return null;
-        const [name, setName] = useState(selectedCollection.name);
-        const [permissions, setPermissions] = useState(selectedCollection.$permissions.join(', '));
-        const [enabled, setEnabled] = useState(selectedCollection.enabled);
-        const [security, setSecurity] = useState(selectedCollection.documentSecurity);
-        const [isSaving, setIsSaving] = useState(false);
-
-        const handleSave = async () => {
-            setIsSaving(true);
-            try {
-                await handleUpdateCollectionSettings({
-                    name, 
-                    permissions, 
-                    enabled, 
-                    documentSecurity: security
-                });
-            } finally {
-                setIsSaving(false);
-            }
-        };
-
-        return (
-            <div className="space-y-6 animate-fade-in">
-                <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-6">
-                    <h3 className="text-lg font-semibold text-gray-200 mb-4 flex items-center gap-2">
-                        <SettingsIcon className="text-gray-400" /> General Settings
-                    </h3>
-                    <div className="space-y-4 max-w-2xl">
-                        <div>
-                            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Collection Name</label>
-                            <input 
-                                type="text" value={name} onChange={e => setName(e.target.value)}
-                                className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-100 focus:border-cyan-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Permissions</label>
-                            <input 
-                                type="text" value={permissions} onChange={e => setPermissions(e.target.value)}
-                                className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-100 focus:border-cyan-500 outline-none"
-                                placeholder='read("any"), create("users")'
-                            />
-                        </div>
-                        <div className="flex gap-6 pt-2">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} className="rounded bg-gray-800 border-gray-600 text-cyan-600 focus:ring-cyan-500" />
-                                <span className="text-sm text-gray-300">Enabled</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" checked={security} onChange={e => setSecurity(e.target.checked)} className="rounded bg-gray-800 border-gray-600 text-cyan-600 focus:ring-cyan-500" />
-                                <span className="text-sm text-gray-300">Document Security</span>
-                            </label>
-                        </div>
-                        <div className="pt-4">
-                            <button 
-                                onClick={handleSave} 
-                                disabled={isSaving}
-                                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold rounded-lg shadow-lg shadow-cyan-900/20 flex items-center gap-2 disabled:opacity-50"
-                            >
-                                {isSaving ? <LoadingSpinnerIcon /> : <CheckIcon />} Save Changes
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-red-900/10 border border-red-900/30 rounded-xl p-6">
-                    <h3 className="text-lg font-semibold text-red-400 mb-2 flex items-center gap-2">
-                        <WarningIcon /> Danger Zone
-                    </h3>
-                    <p className="text-sm text-gray-400 mb-4">Deleting a collection is permanent and will delete all documents contained within it.</p>
-                    <button 
-                        onClick={() => handleDeleteCollection(selectedCollection)}
-                        className="px-4 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-800 text-red-300 text-sm font-semibold rounded-lg transition-colors"
-                    >
-                        Delete Collection
-                    </button>
-                </div>
-            </div>
-        )
-    };
-
     return (
         <div className="flex flex-1 h-full overflow-hidden bg-gray-950">
             {/* Content Area */}
@@ -876,247 +738,56 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
                 
                 <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-10">
 
-                    {/* OVERVIEW */}
                     {activeTab === 'overview' && (
-                        <>
-                            <header><h1 className="text-2xl font-bold text-gray-100 mb-4">Project Overview</h1></header>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                                <StatCard 
-                                    title="Databases" 
-                                    value={databases.length} 
-                                    icon={<DatabaseIcon />} 
-                                    color="text-red-400"
-                                    onClick={() => onTabChange('database')}
-                                    description="Manage your data structure"
-                                />
-                                <StatCard 
-                                    title="Buckets" 
-                                    value={buckets.length} 
-                                    icon={<StorageIcon />} 
-                                    color="text-green-400"
-                                    onClick={() => onTabChange('storage')}
-                                    description="File storage & permissions"
-                                />
-                                <StatCard 
-                                    title="Functions" 
-                                    value={functions.length} 
-                                    icon={<FunctionIcon />} 
-                                    color="text-blue-400"
-                                    onClick={() => onTabChange('functions')}
-                                    description="Serverless logic & runtimes"
-                                />
-                                <StatCard 
-                                    title="Users" 
-                                    value={users.length} 
-                                    icon={<UserIcon />} 
-                                    color="text-purple-400"
-                                    onClick={() => onTabChange('users')}
-                                    description="Auth & User management"
-                                />
-                                <StatCard 
-                                    title="Teams" 
-                                    value={teams.length} 
-                                    icon={<TeamIcon />} 
-                                    color="text-yellow-400"
-                                    onClick={() => onTabChange('teams')}
-                                    description="Organization & Roles"
-                                />
-                            </div>
-                        </>
-                    )}
-
-                    {/* DATABASES */}
-                    {activeTab === 'database' && (
-                        !selectedDb ? (
-                            <ResourceTable title="Databases" data={databases} onCreate={handleCreateDatabase} onDelete={handleDeleteDatabase} onSelect={(item) => setSelectedDb(item)} createLabel="New DB" />
-                        ) : !selectedCollection ? (
-                            <>
-                                <Breadcrumb items={[{ label: 'Databases', onClick: () => setSelectedDb(null) }, { label: selectedDb.name }]} />
-                                <ResourceTable title={`Collections in ${selectedDb.name}`} data={collections} onCreate={handleCreateCollection} onDelete={handleDeleteCollection} onSelect={setSelectedCollection} createLabel="New Collection" />
-                            </>
-                        ) : (
-                            <div className="flex flex-col h-full">
-                                <div className="mb-6">
-                                    <Breadcrumb items={[{ label: 'Databases', onClick: () => setSelectedDb(null) }, { label: selectedDb.name, onClick: () => setSelectedCollection(null) }, { label: selectedCollection.name }]} />
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-cyan-900/30 rounded-lg text-cyan-400"><DatabaseIcon size={24} /></div>
-                                            <div>
-                                                <h1 className="text-xl font-bold text-gray-100">{selectedCollection.name}</h1>
-                                                <p className="text-xs font-mono text-gray-500">{selectedCollection.$id}</p>
-                                            </div>
-                                            {!selectedCollection.enabled && <span className="ml-2 px-2 py-0.5 rounded text-[10px] bg-red-900/30 text-red-400 border border-red-900/50 uppercase font-bold">Disabled</span>}
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Tabs */}
-                                    <div className="flex border-b border-gray-800">
-                                        {[
-                                            { id: 'documents', label: 'Documents', icon: <FileIcon size={14} /> },
-                                            { id: 'attributes', label: 'Attributes', icon: <DatabaseIcon size={14} /> },
-                                            { id: 'indexes', label: 'Indexes', icon: <KeyIcon size={14} /> },
-                                            { id: 'settings', label: 'Settings', icon: <SettingsIcon size={14} /> }
-                                        ].map(tab => (
-                                            <button
-                                                key={tab.id}
-                                                onClick={() => setCollectionTab(tab.id as CollectionTab)}
-                                                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${collectionTab === tab.id ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
-                                            >
-                                                {tab.icon} {tab.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="flex-1">
-                                    {collectionTab === 'documents' && (
-                                        <ResourceTable 
-                                            data={documents} 
-                                            onCreate={handleCreateDocument} 
-                                            onDelete={handleDeleteDocument} 
-                                            onEdit={handleUpdateDocument}
-                                            createLabel="Add Document" 
-                                            renderName={(doc) => <span className="font-mono text-xs text-gray-300">{JSON.stringify(doc).slice(0, 80)}...</span>} 
-                                            headers={['ID', 'Data Preview', '', 'Actions']}
-                                        />
-                                    )}
-
-                                    {collectionTab === 'attributes' && (
-                                        <ResourceTable 
-                                            data={attributes} 
-                                            onDelete={(item) => handleDeleteAttribute(item)} 
-                                            createLabel="Add Attribute"
-                                            onCreate={() => handleCreateAttribute(attributeType)}
-                                            extraActions={
-                                                <div className="relative mr-2">
-                                                    <select 
-                                                        value={attributeType} 
-                                                        onChange={e => setAttributeType(e.target.value)}
-                                                        className="bg-gray-800 border border-gray-600 text-gray-300 text-xs rounded-lg px-3 py-1.5 outline-none focus:border-cyan-500 appearance-none pr-8 cursor-pointer"
-                                                    >
-                                                        <option value="string">String</option>
-                                                        <option value="integer">Integer</option>
-                                                        <option value="float">Float</option>
-                                                        <option value="boolean">Boolean</option>
-                                                        <option value="email">Email</option>
-                                                        <option value="url">URL</option>
-                                                        <option value="ip">IP</option>
-                                                        <option value="enum">Enum</option>
-                                                        <option value="datetime">Datetime</option>
-                                                        <option value="relationship">Relationship</option>
-                                                    </select>
-                                                    <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none text-gray-500">
-                                                        <ChevronDownIcon size={12} />
-                                                    </div>
-                                                </div>
-                                            }
-                                            renderName={(item) => <span className="font-mono text-cyan-300">{item.key} <span className="text-gray-500">({item.type})</span></span>} 
-                                            headers={['Key', 'Type', 'Details', 'Actions']}
-                                            renderExtra={(item) => (
-                                                <div className="flex gap-2">
-                                                    {item.required && <span className="text-[10px] bg-red-900/30 text-red-400 px-1.5 py-0.5 rounded">Req</span>}
-                                                    {item.array && <span className="text-[10px] bg-blue-900/30 text-blue-400 px-1.5 py-0.5 rounded">Array</span>}
-                                                </div>
-                                            )}
-                                        />
-                                    )}
-
-                                    {collectionTab === 'indexes' && (
-                                         <ResourceTable 
-                                            data={indexes} 
-                                            onDelete={(item) => handleDeleteIndex(item)} 
-                                            onCreate={handleCreateIndex} 
-                                            createLabel="Add Index"
-                                            renderName={(item) => <span className="font-mono text-yellow-300">{item.key} <span className="text-gray-500">({item.type})</span></span>} 
-                                            headers={['Key', 'Type', 'Details', 'Actions']}
-                                            renderExtra={(item) => <span className="text-xs text-gray-500">{item.attributes.join(', ')}</span>}
-                                        />
-                                    )}
-
-                                    {collectionTab === 'settings' && (
-                                        <CollectionSettings />
-                                    )}
-                                </div>
-                            </div>
-                        )
-                    )}
-
-                    {/* STORAGE */}
-                    {activeTab === 'storage' && (
-                        !selectedBucket ? (
-                            <ResourceTable title="Storage Buckets" data={buckets} onCreate={handleCreateBucket} onDelete={handleDeleteBucket} onSelect={(item) => setSelectedBucket(item)} createLabel="New Bucket" />
-                        ) : (
-                            <>
-                                <Breadcrumb items={[{ label: 'Storage', onClick: () => setSelectedBucket(null) }, { label: selectedBucket.name }]} />
-                                <ResourceTable title={`Files in ${selectedBucket.name}`} data={files} onDelete={handleDeleteFile} 
-                                    renderName={(f) => <div className="flex items-center gap-2"><FileIcon size={14}/> {f.name}</div>}
-                                    renderExtra={(f) => <span className="text-xs text-gray-500">{(f.sizeOriginal / 1024).toFixed(1)} KB</span>}
-                                />
-                                <div className="bg-gray-800/30 border border-gray-700/50 rounded-lg p-4 text-center">
-                                    <p className="text-sm text-gray-400">To upload files, use the Agent chat interface with the file attachment button.</p>
-                                </div>
-                            </>
-                        )
-                    )}
-
-                    {/* FUNCTIONS */}
-                    {activeTab === 'functions' && (
-                        !selectedFunction ? (
-                            <ResourceTable title="Functions" data={functions} onCreate={onCreateFunction} onDelete={handleDeleteFunction} onSelect={(item) => setSelectedFunction(item)} createLabel="Create Function" 
-                                renderExtra={(f) => <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${f.enabled ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>{f.runtime}</span>}
-                            />
-                        ) : (
-                            <>
-                                <Breadcrumb items={[{ label: 'Functions', onClick: () => setSelectedFunction(null) }, { label: selectedFunction.name }]} />
-                                <div className="space-y-8">
-                                    <ResourceTable title="Deployments" data={deployments} 
-                                        renderName={(d) => <span className="flex items-center gap-2"><CodeIcon size={14}/> <span className="font-mono">{d.$id}</span></span>}
-                                        renderExtra={(d) => (
-                                            <div className="flex items-center gap-2">
-                                                <span className={`text-[10px] ${d.status === 'ready' ? 'text-green-400' : 'text-yellow-400'}`}>{d.status}</span>
-                                                {selectedFunction.deployment !== d.$id && <button onClick={() => handleActivateDeployment(d.$id)} className="text-[10px] bg-gray-700 px-2 py-1 rounded hover:bg-gray-600 text-white">Activate</button>}
-                                                {selectedFunction.deployment === d.$id && <span className="text-[10px] bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-500/30">Active</span>}
-                                            </div>
-                                        )}
-                                    />
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <ResourceTable title="Variables" data={variables} onCreate={handleCreateVariable} onDelete={handleDeleteVariable} createLabel="Add Var"
-                                            renderName={(v) => <span className="font-mono text-cyan-300">{v.key}</span>}
-                                            renderExtra={(v) => <span className="font-mono text-gray-500 text-xs">***</span>}
-                                        />
-                                        <ResourceTable title="Executions (Logs)" data={executions} 
-                                            renderName={(e) => <span className="flex items-center gap-2"><TerminalIcon size={14}/> <span className="font-mono">{e.$id}</span></span>}
-                                            renderExtra={(e) => <span className={`text-[10px] ${e.status === 'completed' ? 'text-green-400' : 'text-red-400'}`}>{e.status} ({e.duration}s)</span>}
-                                        />
-                                    </div>
-                                </div>
-                            </>
-                        )
-                    )}
-
-                    {/* USERS */}
-                    {activeTab === 'users' && (
-                        <ResourceTable title="Users" data={users} onCreate={handleCreateUser} onDelete={handleDeleteUser} createLabel="New User"
-                            renderName={(u) => <div><div className="font-medium text-gray-200">{u.name || 'No Name'}</div><div className="text-xs text-gray-500">{u.email}</div></div>}
-                            renderExtra={(u) => <span className={`text-[10px] ${u.status ? 'text-green-500' : 'text-red-500'}`}>{u.status ? 'Verified' : 'Unverified'}</span>}
-                            headers={['ID', 'User', 'Status', 'Actions']}
+                        <OverviewTab 
+                            databases={databases} buckets={buckets} functions={functions} 
+                            users={users} teams={teams} onTabChange={onTabChange} 
                         />
                     )}
 
-                    {/* TEAMS */}
+                    {activeTab === 'database' && (
+                        <DatabasesTab 
+                            databases={databases} selectedDb={selectedDb} selectedCollection={selectedCollection}
+                            collections={collections} documents={documents} attributes={attributes} indexes={indexes}
+                            onCreateDatabase={handleCreateDatabase} onDeleteDatabase={handleDeleteDatabase} onSelectDb={setSelectedDb}
+                            onCreateCollection={handleCreateCollection} onDeleteCollection={handleDeleteCollection} onSelectCollection={setSelectedCollection}
+                            onCreateDocument={handleCreateDocument} onUpdateDocument={handleUpdateDocument} onDeleteDocument={handleDeleteDocument}
+                            onCreateAttribute={handleCreateAttribute} onDeleteAttribute={handleDeleteAttribute}
+                            onCreateIndex={handleCreateIndex} onDeleteIndex={handleDeleteIndex}
+                            onUpdateCollectionSettings={handleUpdateCollectionSettings}
+                        />
+                    )}
+
+                    {activeTab === 'storage' && (
+                        <StorageTab 
+                            buckets={buckets} selectedBucket={selectedBucket} files={files}
+                            onCreateBucket={handleCreateBucket} onDeleteBucket={handleDeleteBucket} onSelectBucket={setSelectedBucket}
+                            onDeleteFile={handleDeleteFile}
+                        />
+                    )}
+
+                    {activeTab === 'functions' && (
+                        <FunctionsTab 
+                            functions={functions} selectedFunction={selectedFunction} 
+                            deployments={deployments} executions={executions}
+                            onCreateFunction={onCreateFunction} onDeleteFunction={handleDeleteFunction} onSelectFunction={setSelectedFunction}
+                            onActivateDeployment={handleActivateDeployment}
+                            onDeleteAllExecutions={handleDeleteAllExecutions}
+                            onViewExecution={handleViewExecution}
+                            onBulkDeleteDeployments={handleBulkDeleteDeployments}
+                        />
+                    )}
+
+                    {activeTab === 'users' && (
+                        <UsersTab users={users} onCreateUser={handleCreateUser} onDeleteUser={handleDeleteUser} />
+                    )}
+
                     {activeTab === 'teams' && (
-                        !selectedTeam ? (
-                            <ResourceTable title="Teams" data={teams} onCreate={handleCreateTeam} onDelete={handleDeleteTeam} onSelect={(item) => setSelectedTeam(item)} createLabel="New Team" />
-                        ) : (
-                            <>
-                                <Breadcrumb items={[{ label: 'Teams', onClick: () => setSelectedTeam(null) }, { label: selectedTeam.name }]} />
-                                <ResourceTable title="Memberships" data={memberships} onCreate={handleCreateMembership} onDelete={handleDeleteMembership} createLabel="Invite Member"
-                                    renderName={(m) => <div><div className="text-gray-200">{m.userName || m.userEmail}</div><div className="text-xs text-gray-500">{m.userEmail}</div></div>}
-                                    renderExtra={(m) => <div className="flex gap-1">{m.roles.map(r => <span key={r} className="text-[10px] bg-gray-700 px-1.5 py-0.5 rounded text-gray-300">{r}</span>)}</div>}
-                                    headers={['ID', 'User', 'Roles', 'Actions']}
-                                />
-                            </>
-                        )
+                        <TeamsTab 
+                            teams={teams} selectedTeam={selectedTeam} memberships={memberships}
+                            onCreateTeam={handleCreateTeam} onDeleteTeam={handleDeleteTeam} onSelectTeam={setSelectedTeam}
+                            onCreateMembership={handleCreateMembership} onDeleteMembership={handleDeleteMembership}
+                        />
                     )}
                 </div>
             </div>
@@ -1127,6 +798,9 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
                     <div className="space-y-4">
                         {modal.message && <p className="text-gray-300 mb-4">{modal.message}</p>}
                         
+                        {/* Custom Content Renderer */}
+                        {modal.type === 'custom' && modal.content}
+
                         {modal.type === 'form' && modal.fields && (
                             <div className="space-y-4">
                                 {modal.fields.map(field => (
@@ -1181,12 +855,16 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
                         )}
 
                         <div className="flex justify-end gap-3 pt-4 border-t border-gray-700 mt-6">
-                            <button onClick={closeModal} className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">Cancel</button>
+                            {!modal.hideCancel && <button onClick={closeModal} className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">Cancel</button>}
                             <button 
                                 onClick={async () => {
+                                    if(modal.type === 'custom') {
+                                        closeModal();
+                                        return;
+                                    }
                                     setModalLoading(true);
                                     try {
-                                        await modal.onConfirm(modal.type === 'form' ? formValues : undefined);
+                                        if(modal.onConfirm) await modal.onConfirm(modal.type === 'form' ? formValues : undefined);
                                         closeModal();
                                     } catch(e) {
                                         console.error(e);

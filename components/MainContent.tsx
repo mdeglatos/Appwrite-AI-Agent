@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect } from 'react';
 import type { Models } from 'appwrite';
 import { RiRobot2Line } from 'react-icons/ri';
@@ -16,6 +17,20 @@ interface MainContentProps {
     setIsLeftSidebarOpen: (isOpen: boolean) => void;
 }
 
+const EmptyState = ({ title, description, icon, action }: { title: string, description: string, icon?: React.ReactNode, action?: React.ReactNode }) => (
+    <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-fade-in mt-10">
+       <div className="relative group mb-8">
+           <div className="absolute -inset-8 bg-gradient-to-t from-cyan-600/20 to-purple-600/20 rounded-full blur-2xl opacity-50"></div>
+           <div className="relative w-24 h-24 bg-gray-900/80 backdrop-blur-xl rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl">
+               {icon || <RiRobot2Line size={48} className="text-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]" />}
+           </div>
+       </div>
+       <h2 className="text-4xl font-bold text-white mb-4 tracking-tight">{title}</h2>
+       <p className="text-gray-400 max-w-lg mb-8 leading-relaxed text-lg">{description}</p>
+       {action}
+   </div>
+);
+
 export const MainContent: React.FC<MainContentProps> = ({
     messages,
     activeProject,
@@ -32,20 +47,6 @@ export const MainContent: React.FC<MainContentProps> = ({
             chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
         }
     }, [messages]);
-
-    const EmptyState = ({ title, description, icon, action }: { title: string, description: string, icon?: React.ReactNode, action?: React.ReactNode }) => (
-         <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-fade-in mt-10">
-            <div className="relative group mb-8">
-                <div className="absolute -inset-8 bg-gradient-to-t from-cyan-600/20 to-purple-600/20 rounded-full blur-2xl opacity-50"></div>
-                <div className="relative w-24 h-24 bg-gray-900/80 backdrop-blur-xl rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl">
-                    {icon || <RiRobot2Line size={48} className="text-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]" />}
-                </div>
-            </div>
-            <h2 className="text-4xl font-bold text-white mb-4 tracking-tight">{title}</h2>
-            <p className="text-gray-400 max-w-lg mb-8 leading-relaxed text-lg">{description}</p>
-            {action}
-        </div>
-    );
 
     const renderWelcomeMessage = () => {
         if (isFunctionContextLoading) {

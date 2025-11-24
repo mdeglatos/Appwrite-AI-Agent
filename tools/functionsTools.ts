@@ -1,4 +1,5 @@
 
+
 import { getSdkFunctions, ID, Query } from '../services/appwrite';
 import type { AIContext, AppwriteProject } from '../types';
 import { Type, type FunctionDeclaration } from '@google/genai';
@@ -224,15 +225,16 @@ async function createFunction(context: AIContext, { functionId, name, runtime, e
         return await functions.create(
             finalFuncId,
             name,
-            runtime,
-            execute,
-            events,
+            runtime as any,
+            execute as any,
+            events as any,
             schedule,
             timeout,
             enabled,
             logging,
             entrypoint,
             commands,
+            undefined, // scopes
             installationId,
             providerRepositoryId,
             providerBranch,
@@ -297,15 +299,16 @@ async function updateFunction(context: AIContext, { functionId, name, runtime, e
         return await sdkFunctions.update(
             functionId,
             name,
-            finalRuntime, 
-            execute,
-            events,
+            finalRuntime as any, 
+            execute as any,
+            events as any,
             schedule,
             timeout,
             enabled,
             logging,
             entrypoint,
             commands,
+            undefined, // scopes
             installationId,
             providerRepositoryId,
             providerBranch,
@@ -346,7 +349,7 @@ async function getFunctionDeploymentCode(context: AIContext, { functionId, deplo
             // If no deploymentId is provided, get the function to find its active deployment.
             const functions = getSdkFunctions(context.project);
             const func = await functions.get(functionId);
-            finalDeploymentId = func.deployment;
+            finalDeploymentId = (func as any).deployment;
         }
 
         const files = await downloadAndUnpackDeployment(context.project, functionId, finalDeploymentId);
@@ -476,7 +479,7 @@ async function createExecution(context: AIContext, { functionId, body, async, pa
                 return { error: 'Invalid JSON format for headers. Please provide a valid JSON string.' };
             }
         }
-        return await functions.createExecution(functionId, body, async, path, method, parsedHeaders);
+        return await functions.createExecution(functionId, body, async, path, method as any, parsedHeaders);
     } catch (error) {
         return handleApiError(error);
     }

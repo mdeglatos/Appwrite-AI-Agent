@@ -49,6 +49,16 @@ export async function addProject(projectData: NewAppwriteProject, userId: string
     return response;
 }
 
+export async function updateProject(docId: string, projectData: NewAppwriteProject): Promise<AppwriteProject> {
+    const response = await databases.updateDocument<Models.Document & AppwriteProject>(
+        appwriteConfig.databaseId,
+        appwriteConfig.projectsCollectionId,
+        docId,
+        projectData
+    );
+    return response;
+}
+
 export async function deleteProject(docId: string): Promise<void> {
     await databases.deleteDocument(
         appwriteConfig.databaseId,

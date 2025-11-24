@@ -95,7 +95,7 @@ export const CreateFunctionModal: React.FC<CreateFunctionModalProps> = ({ isOpen
             const createdFunc = await functions.create(
                 finalId,
                 name,
-                runtime,
+                runtime as any,
                 finalExecute.length > 0 ? finalExecute : undefined,
                 finalEvents.length > 0 ? finalEvents : undefined,
                 schedule || undefined,

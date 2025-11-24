@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import type { AppwriteProject, Database, Collection, Bucket, AppwriteFunction } from '../types';
 import { getSdkDatabases, getSdkStorage, getSdkFunctions, Query } from '../services/appwrite';
@@ -49,10 +50,10 @@ export function useAppContext(activeProject: AppwriteProject | null, logCallback
             ]);
             const newDatabases: Database[] = dbResponse.databases;
             const newBuckets: Bucket[] = bucketResponse.buckets;
-            const newFunctions: AppwriteFunction[] = funcResponse.functions;
+            const newFunctions = funcResponse.functions;
             setDatabases(newDatabases);
             setBuckets(newBuckets);
-            setFunctions(newFunctions);
+            setFunctions(newFunctions as unknown as AppwriteFunction[]);
 
             const dbStillExists = selectedDatabase && newDatabases.some(db => db.$id === selectedDatabase.$id);
             if (!dbStillExists) {

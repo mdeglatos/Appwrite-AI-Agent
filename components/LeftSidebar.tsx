@@ -5,9 +5,10 @@ import type { NewAppwriteProject } from '../services/projectService';
 import { 
     AddIcon, DeleteIcon, CloseIcon, ToolsIcon, ProjectsIcon, ChevronDownIcon, 
     KeyIcon, SettingsIcon, DashboardIcon, DatabaseIcon, StorageIcon, 
-    FunctionIcon, TeamIcon 
+    FunctionIcon, TeamIcon, EditIcon
 } from './Icons';
 import { toolDefinitionGroups } from '../tools';
+import { Modal } from './Modal';
 
 // Sub-component for a single tool toggle switch
 const ToolToggle: React.FC<{
@@ -74,6 +75,7 @@ interface LeftSidebarProps {
   activeProject: AppwriteProject | null;
   onSave: (projectData: NewAppwriteProject) => void;
   onDelete: (projectId: string, projectName: string) => void;
+  onEdit: (project: AppwriteProject) => void;
   onSelect: (project: AppwriteProject) => void;
   activeTools: { [key: string]: boolean };
   onToolsChange: (tools: { [key: string]: boolean }) => void;
@@ -98,6 +100,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   activeProject,
   onSave,
   onDelete,
+  onEdit,
   onSelect,
   activeTools,
   onToolsChange,
@@ -130,6 +133,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   });
 
   const [expandedToolCategories, setExpandedToolCategories] = useState<{ [key: string]: boolean }>({});
+  const [editingProject, setEditingProject] = useState<AppwriteProject | null>(null);
 
   useEffect(() => {
     setApiKeyInput(geminiApiKey || '');
@@ -156,6 +160,14 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     setProjectId('');
     setApiKey('');
     setExpandedSections(prev => ({ ...prev, addProject: false, projects: true }));
+  };
+
+  const handleUpdateProjectSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingProject) {
+        onEdit(editingProject);
+        setEditingProject(null);
+    }
   };
 
   const handleToolChange = (toolName: string, isChecked: boolean) => {
@@ -285,13 +297,22 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                       <p className={`text-sm font-medium truncate transition-colors ${activeProject?.$id === p.$id ? 'text-cyan-300' : 'group-hover:text-gray-200'}`}>{p.name}</p>
                       <p className="text-[10px] text-gray-600 truncate font-mono mt-0.5">{p.projectId}</p>
                     </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onDelete(p.$id, p.name); }}
-                      className="text-gray-600 hover:text-red-400 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-all hover:bg-gray-800"
-                      aria-label={`Delete ${p.name}`}
-                    >
-                      <DeleteIcon />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setEditingProject(p); }}
+                            className="text-gray-600 hover:text-cyan-400 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-all hover:bg-gray-800"
+                            aria-label={`Edit ${p.name}`}
+                        >
+                            <EditIcon size={14} />
+                        </button>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onDelete(p.$id, p.name); }}
+                            className="text-gray-600 hover:text-red-400 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-all hover:bg-gray-800"
+                            aria-label={`Delete ${p.name}`}
+                        >
+                            <DeleteIcon />
+                        </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -521,6 +542,34 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             />
         )}
       </aside>
+
+      {/* Edit Project Modal */}
+      {editingProject && (
+          <Modal isOpen={!!editingProject} onClose={() => setEditingProject(null)} title="Edit Project">
+               <form onSubmit={handleUpdateProjectSubmit} className="flex flex-col gap-4">
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Project Name</label>
+                        <input type="text" value={editingProject.name} onChange={e => setEditingProject({...editingProject, name: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-100 focus:ring-1 focus:ring-cyan-500 outline-none" required />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Endpoint URL</label>
+                        <input type="url" value={editingProject.endpoint} onChange={e => setEditingProject({...editingProject, endpoint: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-100 focus:ring-1 focus:ring-cyan-500 outline-none" required />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Project ID</label>
+                        <input type="text" value={editingProject.projectId} onChange={e => setEditingProject({...editingProject, projectId: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-100 font-mono focus:ring-1 focus:ring-cyan-500 outline-none" required />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">API Key</label>
+                        <input type="password" value={editingProject.apiKey} onChange={e => setEditingProject({...editingProject, apiKey: e.target.value})} className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-100 font-mono focus:ring-1 focus:ring-cyan-500 outline-none" required />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-2">
+                        <button type="button" onClick={() => setEditingProject(null)} className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">Cancel</button>
+                        <button type="submit" className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold rounded-lg shadow-lg shadow-cyan-900/20">Save Changes</button>
+                    </div>
+               </form>
+          </Modal>
+      )}
     </>
   );
 };
