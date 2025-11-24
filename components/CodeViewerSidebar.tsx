@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { UnpackedFile } from '../tools/functionsTools';
 import { CloseIcon, CopyIcon, FileIcon, CheckIcon, CodeIcon, LoadingSpinnerIcon, FolderIcon, FileAddIcon, FolderAddIcon, EditIcon, DeleteIcon, ChevronDownIcon, ChevronUpIcon } from './Icons';
 
@@ -190,6 +190,10 @@ export const CodeViewerSidebar: React.FC<CodeViewerSidebarProps> = ({
     const [activeFilePath, setActiveFilePath] = useState<string | null>(null);
     const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
+    // Refs for synchronized scrolling
+    const textAreaRef = useRef<HTMLTextAreaElement>(null);
+    const lineNumbersRef = useRef<HTMLDivElement>(null);
+
     useEffect(() => {
         if (originalFiles.length > 0) {
             const firstFile = originalFiles.find(f => f.name.endsWith('.js') || f.name.endsWith('.ts')) || originalFiles[0];
@@ -202,6 +206,19 @@ export const CodeViewerSidebar: React.FC<CodeViewerSidebarProps> = ({
     const fileTree = useMemo(() => buildFileTree(files), [files]);
     const activeFile = useMemo(() => files.find(f => f.name === activeFilePath), [files, activeFilePath]);
     const rootNode = buildFileTree(files);
+
+    // Calculate line numbers
+    const lineCount = useMemo(() => {
+        if (!activeFile?.content) return 1;
+        return activeFile.content.split('\n').length;
+    }, [activeFile?.content]);
+
+    // Synchronize scrolling
+    const handleScroll = () => {
+        if (lineNumbersRef.current && textAreaRef.current) {
+            lineNumbersRef.current.scrollTop = textAreaRef.current.scrollTop;
+        }
+    };
 
     const handleCopy = () => {
         if (!activeFile) return;
@@ -263,11 +280,22 @@ export const CodeViewerSidebar: React.FC<CodeViewerSidebarProps> = ({
                                         {copyStatus === 'Copied' ? <CheckIcon /> : <CopyIcon />} {copyStatus || 'Copy'}
                                     </button>
                                 </div>
-                                <div className="relative flex-1 overflow-hidden">
+                                <div className="relative flex-1 flex min-h-0 overflow-hidden">
+                                    {/* Line Numbers */}
+                                    <div
+                                        ref={lineNumbersRef}
+                                        className="hidden sm:block flex-shrink-0 w-12 text-right text-gray-600 font-mono text-sm leading-6 pt-4 pb-4 pr-3 bg-[#0d1117] select-none overflow-hidden border-r border-gray-800/50 whitespace-pre"
+                                        aria-hidden="true"
+                                    >
+                                         {Array.from({ length: lineCount }, (_, i) => i + 1).join('\n')}
+                                    </div>
+
                                     <textarea
+                                        ref={textAreaRef}
+                                        onScroll={handleScroll}
                                         value={activeFile.content}
                                         onChange={(e) => onFileContentChange(activeFile.name, e.target.value)}
-                                        className="absolute inset-0 w-full h-full p-4 bg-[#0d1117] text-gray-300 font-mono text-sm resize-none focus:outline-none leading-6 custom-scrollbar"
+                                        className="flex-1 w-full h-full p-4 pl-3 bg-[#0d1117] text-gray-300 font-mono text-sm resize-none focus:outline-none leading-6 custom-scrollbar whitespace-pre"
                                         spellCheck="false"
                                         style={{ tabSize: 2 }}
                                     />

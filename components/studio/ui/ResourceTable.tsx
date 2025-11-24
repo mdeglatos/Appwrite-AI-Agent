@@ -22,6 +22,8 @@ interface ResourceTableProps<T> {
     };
     // Row highlighting
     isRowActive?: (item: T) => boolean;
+    // Layout
+    autoHeight?: boolean;
 }
 
 export const ResourceTable = <T extends { $id: string } & Partial<{ name: string, key: string }>>({ 
@@ -37,7 +39,8 @@ export const ResourceTable = <T extends { $id: string } & Partial<{ name: string
     headers = ['ID', 'Name / Key', 'Details', 'Actions'],
     extraActions,
     selection,
-    isRowActive
+    isRowActive,
+    autoHeight = false,
 }: ResourceTableProps<T>) => {
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -59,7 +62,7 @@ export const ResourceTable = <T extends { $id: string } & Partial<{ name: string
     };
 
     return (
-        <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl overflow-hidden animate-fade-in h-full flex flex-col shadow-sm">
+        <div className={`bg-gray-800/30 border border-gray-700/50 rounded-xl overflow-hidden animate-fade-in flex flex-col shadow-sm ${autoHeight ? '' : 'h-full'}`}>
             {(title || onCreate || extraActions) && (
                 <div className="p-4 border-b border-gray-700/50 flex flex-wrap justify-between items-center bg-gray-900/30 gap-3">
                     {title && <h3 className="text-lg font-semibold text-gray-200">{title}</h3>}
@@ -73,7 +76,7 @@ export const ResourceTable = <T extends { $id: string } & Partial<{ name: string
                     </div>
                 </div>
             )}
-            <div className="overflow-x-auto flex-1 custom-scrollbar">
+            <div className={`overflow-x-auto custom-scrollbar ${autoHeight ? '' : 'flex-1'}`}>
                 <table className="w-full text-left text-sm text-gray-400">
                     <thead className="bg-gray-900/50 text-xs uppercase font-semibold text-gray-500 sticky top-0 z-10 backdrop-blur-md">
                         <tr>

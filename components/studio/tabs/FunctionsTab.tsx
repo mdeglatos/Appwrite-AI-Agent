@@ -107,6 +107,7 @@ export const FunctionsTab: React.FC<FunctionsTabProps> = ({
                         selectedIds: selectedDeploymentIds,
                         onSelectionChange: setSelectedDeploymentIds
                     }}
+                    autoHeight
                     isRowActive={(d) => d.$id === selectedFunction.deployment}
                     extraActions={
                         selectedDeploymentIds.length > 0 && onBulkDeleteDeployments && (
@@ -132,35 +133,36 @@ export const FunctionsTab: React.FC<FunctionsTabProps> = ({
                     )}
                 />
                 
-                <div className="flex flex-col h-full">
-                        <ResourceTable title="Executions (Logs)" data={executions} 
-                        extraActions={
-                            executions.length > 0 && (
-                                <button 
-                                    onClick={onDeleteAllExecutions}
-                                    className="flex items-center gap-2 px-2 py-1 bg-red-900/30 hover:bg-red-900/50 border border-red-800 text-red-300 text-[10px] font-bold rounded-lg transition-colors"
-                                >
-                                    <DeleteIcon size={12} /> Clear All
-                                </button>
-                            )
-                        }
-                        renderName={(e) => <span className="flex items-center gap-2"><TerminalIcon size={14}/> <span className="font-mono">{e.$id}</span></span>}
-                        renderExtra={(e) => (
-                            <div className="flex items-center justify-between w-full">
-                                <span className={`text-[10px] ${e.status === 'completed' ? 'text-green-400' : e.status === 'failed' ? 'text-red-400' : 'text-yellow-400'}`}>
-                                    {e.status} ({e.duration.toFixed(3)}s)
-                                </span>
-                                <button 
-                                    onClick={(ev) => { ev.stopPropagation(); onViewExecution(e); }}
-                                    className="ml-2 p-1 text-gray-400 hover:text-cyan-400 hover:bg-gray-800 rounded transition-colors"
-                                    title="View Logs"
-                                >
-                                    <EyeIcon size={14} />
-                                </button>
-                            </div>
-                        )}
-                    />
-                </div>
+                <ResourceTable 
+                    title="Executions (Logs)" 
+                    data={executions} 
+                    autoHeight
+                    extraActions={
+                        executions.length > 0 && (
+                            <button 
+                                onClick={onDeleteAllExecutions}
+                                className="flex items-center gap-2 px-2 py-1 bg-red-900/30 hover:bg-red-900/50 border border-red-800 text-red-300 text-[10px] font-bold rounded-lg transition-colors"
+                            >
+                                <DeleteIcon size={12} /> Clear All
+                            </button>
+                        )
+                    }
+                    renderName={(e) => <span className="flex items-center gap-2"><TerminalIcon size={14}/> <span className="font-mono">{e.$id}</span></span>}
+                    renderExtra={(e) => (
+                        <div className="flex items-center justify-between w-full">
+                            <span className={`text-[10px] ${e.status === 'completed' ? 'text-green-400' : e.status === 'failed' ? 'text-red-400' : 'text-yellow-400'}`}>
+                                {e.status} ({e.duration.toFixed(3)}s)
+                            </span>
+                            <button 
+                                onClick={(ev) => { ev.stopPropagation(); onViewExecution(e); }}
+                                className="ml-2 p-1 text-gray-400 hover:text-cyan-400 hover:bg-gray-800 rounded transition-colors"
+                                title="View Logs"
+                            >
+                                <EyeIcon size={14} />
+                            </button>
+                        </div>
+                    )}
+                />
             </div>
         </>
     );
