@@ -513,14 +513,32 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
     const handleDeleteAllExecutions = () => {
         if (!selectedFunction) return;
         confirmAction(
-            "Clear Execution History", 
-            `Are you sure you want to delete all executions for function "${selectedFunction.name}"?`, 
+            "Clear All Execution History", 
+            `Are you sure you want to delete ALL executions for function "${selectedFunction.name}"? This will delete executions recursively until none remain. This might take a while for thousands of logs.`, 
             async () => {
                 const sdk = getSdkFunctions(activeProject);
-                // We delete the currently visible set (pagination would require looping)
-                // This is a bulk delete of what is loaded to keep UI snappy
-                const deletePromises = executions.map(e => sdk.deleteExecution(selectedFunction.$id, e.$id));
-                await Promise.all(deletePromises);
+                
+                let deletedCount = 0;
+                while (true) {
+                    // Fetch the next batch of 100
+                    const res = await sdk.listExecutions(selectedFunction.$id, [
+                        Query.limit(100)
+                    ]);
+                    
+                    if (res.executions.length === 0) break;
+
+                    // Delete them concurrently
+                    await Promise.all(res.executions.map(ex => 
+                        sdk.deleteExecution(selectedFunction.$id, ex.$id).catch(e => console.warn(`Failed to delete execution ${ex.$id}`, e))
+                    ));
+                    
+                    deletedCount += res.executions.length;
+                    
+                    // If less than 100 were returned, we are done
+                    if (res.executions.length < 100) break;
+                }
+                
+                console.log(`Successfully deleted ${deletedCount} executions.`);
                 fetchFunctionDetails(selectedFunction.$id);
             }
         );
