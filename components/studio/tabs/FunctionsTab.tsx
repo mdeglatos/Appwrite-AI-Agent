@@ -23,6 +23,9 @@ interface FunctionsTabProps {
 
     // Bulk Actions
     onBulkDeleteDeployments?: (deploymentIds: string[]) => void;
+    
+    // New prop for code editing
+    onEditCode?: (f: AppwriteFunction) => void;
 }
 
 export const FunctionsTab: React.FC<FunctionsTabProps> = ({
@@ -30,7 +33,8 @@ export const FunctionsTab: React.FC<FunctionsTabProps> = ({
     onCreateFunction, onDeleteFunction, onSelectFunction,
     onActivateDeployment,
     onDeleteAllExecutions, onViewExecution,
-    onBulkDeleteDeployments
+    onBulkDeleteDeployments,
+    onEditCode
 }) => {
     const [selectedDeploymentIds, setSelectedDeploymentIds] = useState<string[]>([]);
 
@@ -48,7 +52,19 @@ export const FunctionsTab: React.FC<FunctionsTabProps> = ({
                 onDelete={onDeleteFunction} 
                 onSelect={(item) => onSelectFunction(item)} 
                 createLabel="Create Function" 
-                renderExtra={(f) => <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${f.enabled ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>{f.runtime}</span>}
+                renderExtra={(f) => (
+                    <div className="flex items-center gap-3">
+                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${f.enabled ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>{f.runtime}</span>
+                        {onEditCode && (
+                             <button
+                                onClick={(e) => { e.stopPropagation(); onEditCode(f); }}
+                                className="flex items-center gap-1.5 px-2 py-1 bg-purple-900/30 hover:bg-purple-900/50 border border-purple-800 text-purple-300 text-[10px] font-bold rounded transition-colors"
+                            >
+                                <CodeIcon size={12} /> Source
+                            </button>
+                        )}
+                    </div>
+                )}
             />
         );
     }
@@ -56,6 +72,33 @@ export const FunctionsTab: React.FC<FunctionsTabProps> = ({
     return (
         <>
             <Breadcrumb items={[{ label: 'Functions', onClick: () => onSelectFunction(null) }, { label: selectedFunction.name }]} />
+            
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 bg-gray-900/30 p-4 rounded-xl border border-gray-800/50">
+                <div className="flex items-center gap-4">
+                     <div>
+                        <h2 className="text-2xl font-bold text-gray-100 flex items-center gap-3">
+                            {selectedFunction.name}
+                            <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${selectedFunction.enabled ? 'bg-green-900/20 text-green-400 border-green-900/50' : 'bg-red-900/20 text-red-400 border-red-900/50'}`}>
+                                {selectedFunction.enabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                        </h2>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 font-mono">
+                            <span>{selectedFunction.$id}</span>
+                            <span>•</span>
+                            <span>{selectedFunction.runtime}</span>
+                        </div>
+                     </div>
+                </div>
+                 {onEditCode && (
+                    <button
+                        onClick={() => onEditCode(selectedFunction)}
+                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold rounded-lg shadow-lg shadow-purple-900/20 transition-all transform hover:scale-105"
+                    >
+                        <CodeIcon size={16} /> Edit Source & Deploy
+                    </button>
+                )}
+            </div>
+
             <div className="space-y-8">
                 <ResourceTable 
                     title="Deployments" 

@@ -48,9 +48,10 @@ interface StudioProps {
     onCreateFunction: () => void;
     activeTab: StudioTab;
     onTabChange: (tab: StudioTab) => void;
+    onEditCode: (func: AppwriteFunction) => void;
 }
 
-export const Studio: React.FC<StudioProps> = ({ activeProject, databases, buckets, functions, refreshData, onCreateFunction, activeTab, onTabChange }) => {
+export const Studio: React.FC<StudioProps> = ({ activeProject, databases, buckets, functions, refreshData, onCreateFunction, activeTab, onTabChange, onEditCode }) => {
     const [isLoading, setIsLoading] = useState(false);
     
     // -- Data States --
@@ -775,6 +776,7 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
                             onDeleteAllExecutions={handleDeleteAllExecutions}
                             onViewExecution={handleViewExecution}
                             onBulkDeleteDeployments={handleBulkDeleteDeployments}
+                            onEditCode={onEditCode}
                         />
                     )}
 

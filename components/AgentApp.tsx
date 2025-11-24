@@ -271,6 +271,10 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
                                 onCreateFunction={() => setIsCreateFunctionModalOpen(true)}
                                 activeTab={activeStudioTab}
                                 onTabChange={setActiveStudioTab}
+                                onEditCode={(func) => {
+                                    setSelectedFunction(func);
+                                    setIsCodeViewerSidebarOpen(true);
+                                }}
                             />
                         ) : (
                              <div className="flex flex-col items-center justify-center h-full text-center p-8">
