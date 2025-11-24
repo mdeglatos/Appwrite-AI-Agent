@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ID, Query } from '../services/appwrite';
 import { getSdkDatabases, getSdkStorage, getSdkFunctions, getSdkUsers, getSdkTeams } from '../services/appwrite';
@@ -574,6 +575,7 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
             isOpen: true,
             type: 'custom',
             title: `Execution Details`,
+            size: '3xl',
             hideCancel: true,
             confirmLabel: "Close",
             confirmClass: "bg-gray-700 hover:bg-gray-600",
@@ -814,7 +816,7 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
 
             {/* Modal Renderer */}
             {modal && modal.isOpen && (
-                <Modal isOpen={modal.isOpen} onClose={closeModal} title={modal.title}>
+                <Modal isOpen={modal.isOpen} onClose={closeModal} title={modal.title} size={modal.size}>
                     <div className="space-y-4">
                         {modal.message && <p className="text-gray-300 mb-4">{modal.message}</p>}
                         

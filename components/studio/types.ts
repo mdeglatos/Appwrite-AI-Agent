@@ -1,4 +1,5 @@
 
+
 export type ModalType = 'confirm' | 'form' | 'custom';
 
 export interface FormField {
@@ -23,4 +24,5 @@ export interface ModalState {
     confirmClass?: string;
     onConfirm?: (formData: any) => Promise<void> | void;
     hideCancel?: boolean;
+    size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl';
 }

@@ -7,9 +7,10 @@ interface ModalProps {
     onClose: () => void;
     title: string;
     children: React.ReactNode;
+    size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl';
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 'md' }) => {
     const modalRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -34,9 +35,19 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
         return null;
     }
 
+    const sizeClasses = {
+        sm: 'max-w-sm',
+        md: 'max-w-md',
+        lg: 'max-w-lg',
+        xl: 'max-w-xl',
+        '2xl': 'max-w-2xl',
+        '3xl': 'max-w-3xl',
+        '4xl': 'max-w-4xl',
+    };
+
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out] p-4"
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-title"
@@ -44,12 +55,12 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
         >
             <div
                 ref={modalRef}
-                className="bg-gray-800 rounded-lg shadow-xl w-full max-w-md m-4 border border-gray-700 animate-[slideInUp_0.3s_ease-out]"
+                className={`bg-gray-800 rounded-lg shadow-xl w-full ${sizeClasses[size]} border border-gray-700 animate-[slideInUp_0.3s_ease-out] flex flex-col max-h-[90vh]`}
                 tabIndex={-1} // Make it focusable
                 onClick={e => e.stopPropagation()} // Prevent closing when clicking inside modal
                 style={{ outline: 'none' }}
             >
-                <header className="flex items-center justify-between p-4 border-b border-gray-700">
+                <header className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
                     <h2 id="modal-title" className="text-xl font-semibold text-gray-100">{title}</h2>
                     <button
                         onClick={onClose}
@@ -59,7 +70,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
                         <CloseIcon />
                     </button>
                 </header>
-                <main className="p-6">
+                <main className="p-6 overflow-y-auto custom-scrollbar">
                     {children}
                 </main>
             </div>
