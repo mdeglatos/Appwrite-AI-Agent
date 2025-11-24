@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
                             </div>
                         </div>
                         <span className="hidden sm:block font-bold text-sm tracking-tight text-gray-200">
-                            DV <span className="text-gray-500 font-normal">Studio</span>
+                            DV <span className="text-gray-500 font-normal">Appwrite Studio</span>
                         </span>
                         
                         {activeProject && (
