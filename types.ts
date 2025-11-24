@@ -118,3 +118,5 @@ export interface AppwriteFunction {
     entrypoint: string;
     commands: string;
 }
+
+export type StudioTab = 'overview' | 'database' | 'storage' | 'functions' | 'users' | 'teams';

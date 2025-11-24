@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+
+import { useState, useEffect, useRef } from 'react';
 import type { Chat } from '@google/genai';
 import { createChatSession, runAI } from '../services/geminiService';
 import type { Message, AIContext, AppwriteProject, Database, Collection, Bucket, AppwriteFunction, UserMessage, ModelMessage } from '../types';
@@ -9,7 +10,6 @@ interface UseChatSessionProps {
     selectedCollection: Collection | null;
     selectedBucket: Bucket | null;
     selectedFunction: AppwriteFunction | null;
-    isCodeModeActive: boolean;
     activeTools: { [key: string]: boolean };
     geminiModel: string;
     geminiThinkingEnabled: boolean;
@@ -24,7 +24,6 @@ export function useChatSession({
     selectedCollection,
     selectedBucket,
     selectedFunction,
-    isCodeModeActive,
     activeTools,
     geminiModel,
     geminiThinkingEnabled,
@@ -38,12 +37,11 @@ export function useChatSession({
     const [error, setError] = useState<string | null>(null);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
-    const prevContextForReset = useRef({ projectId: activeProject?.$id, isCodeModeActive: false });
+    const prevContextForReset = useRef({ projectId: activeProject?.$id });
 
     useEffect(() => {
         const didProjectChange = prevContextForReset.current.projectId !== activeProject?.$id;
-        const didModeChange = prevContextForReset.current.isCodeModeActive !== isCodeModeActive;
-        const isHardReset = didProjectChange || didModeChange;
+        const isHardReset = didProjectChange;
 
         const initializeSession = async () => {
             if (!activeProject) {
@@ -60,7 +58,6 @@ export function useChatSession({
             let initialHistory = isHardReset ? undefined : chat?.history;
             if (isHardReset) setMessages([]);
 
-            const mode = isCodeModeActive ? 'Code Mode' : 'Agent Mode';
             const contextDescription = [
                 context.database ? `DB: ${context.database.name}` : '',
                 context.collection ? `Collection: ${context.collection.name}` : '',
@@ -68,10 +65,10 @@ export function useChatSession({
                 context.fn ? `Function: ${context.fn.name}` : '',
             ].filter(Boolean).join(', ');
 
-            logCallback(`(${mode}) Project context updated. ${contextDescription || 'No specific context.'} Initializing new AI session...`);
+            logCallback(`Project context updated. ${contextDescription || 'No specific context.'} Initializing Smart Mode session...`);
             
             try {
-                const newChat = createChatSession(activeTools, geminiModel, context, geminiThinkingEnabled, geminiApiKey, isCodeModeActive, initialHistory);
+                const newChat = createChatSession(activeTools, geminiModel, context, geminiThinkingEnabled, geminiApiKey, initialHistory);
                 setChat(newChat);
                 if(!isHardReset) setError(null); // Don't clear error if it's just a soft reset
                 logCallback('AI session ready.');
@@ -84,8 +81,8 @@ export function useChatSession({
         };
 
         initializeSession();
-        prevContextForReset.current = { projectId: activeProject?.$id, isCodeModeActive };
-    }, [activeProject, activeTools, geminiApiKey, geminiModel, geminiThinkingEnabled, selectedDatabase, selectedCollection, selectedBucket, selectedFunction, isCodeModeActive, logCallback]);
+        prevContextForReset.current = { projectId: activeProject?.$id };
+    }, [activeProject, activeTools, geminiApiKey, geminiModel, geminiThinkingEnabled, selectedDatabase, selectedCollection, selectedBucket, selectedFunction, logCallback]);
 
 
     const handleSendMessage = async (input: string) => {
@@ -137,7 +134,7 @@ export function useChatSession({
         if (activeProject) {
             try {
                 const context: AIContext = { project: activeProject, database: selectedDatabase, collection: selectedCollection, bucket: selectedBucket, fn: selectedFunction };
-                const newChat = createChatSession(activeTools, geminiModel, context, geminiThinkingEnabled, geminiApiKey, isCodeModeActive);
+                const newChat = createChatSession(activeTools, geminiModel, context, geminiThinkingEnabled, geminiApiKey);
                 setChat(newChat);
                 logCallback('AI session has been reset.');
             } catch (e) {

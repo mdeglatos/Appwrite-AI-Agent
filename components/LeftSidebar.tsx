@@ -1,7 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
-import type { AppwriteProject } from '../types';
+import type { AppwriteProject, StudioTab } from '../types';
 import type { NewAppwriteProject } from '../services/projectService';
-import { AddIcon, DeleteIcon, CloseIcon, ToolsIcon, ProjectsIcon, ChevronDownIcon, ChevronUpIcon, KeyIcon, CheckIcon, SettingsIcon } from './Icons';
+import { 
+    AddIcon, DeleteIcon, CloseIcon, ToolsIcon, ProjectsIcon, ChevronDownIcon, 
+    KeyIcon, SettingsIcon, DashboardIcon, DatabaseIcon, StorageIcon, 
+    FunctionIcon, TeamIcon 
+} from './Icons';
 import { toolDefinitionGroups } from '../tools';
 
 // Sub-component for a single tool toggle switch
@@ -13,10 +18,10 @@ const ToolToggle: React.FC<{
     const id = `toggle-${label}`;
     return (
         <label htmlFor={id} className="flex items-center justify-between cursor-pointer px-3 py-2 rounded-md hover:bg-white/5 transition-colors group">
-            <span className="text-sm text-gray-300 capitalize group-hover:text-gray-100 transition-colors">{label}</span>
+            <span className="text-xs text-gray-400 capitalize group-hover:text-gray-200 transition-colors">{label}</span>
             <div className="relative">
                 <input id={id} type="checkbox" className="sr-only peer" checked={isChecked} onChange={(e) => onChange(e.target.checked)} />
-                <div className="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-300 after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600 peer-checked:after:bg-white"></div>
+                <div className="w-8 h-4 bg-gray-700/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-400 after:border-gray-300 after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-cyan-600/50 peer-checked:after:bg-white"></div>
             </div>
         </label>
     );
@@ -31,22 +36,23 @@ interface CollapsibleSectionProps {
     children: React.ReactNode;
     badge?: React.ReactNode;
     className?: string;
+    transparent?: boolean;
 }
 
-const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, icon, isExpanded, onToggle, children, badge, className = '' }) => (
-    <div className={`border-b border-gray-800 last:border-b-0 ${className}`}>
+const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, icon, isExpanded, onToggle, children, badge, className = '', transparent = false }) => (
+    <div className={` ${transparent ? '' : 'border-b border-gray-800/30'} ${className}`}>
         <button
             onClick={onToggle}
-            className="w-full flex justify-between items-center p-4 text-left hover:bg-gray-800/50 transition-colors focus:outline-none"
+            className="w-full flex justify-between items-center px-4 py-3 text-left hover:bg-gray-800/30 transition-colors focus:outline-none"
             aria-expanded={isExpanded}
         >
-            <div className="flex items-center gap-3 text-gray-300">
-                <span className="text-gray-400 group-hover:text-cyan-400 transition-colors">{icon}</span>
-                <h3 className="text-sm font-semibold">{title}</h3>
+            <div className="flex items-center gap-3 text-gray-400 group">
+                <span className="text-gray-500 group-hover:text-cyan-400 transition-colors">{icon}</span>
+                <h3 className="text-xs font-semibold uppercase tracking-wider group-hover:text-gray-200 transition-colors">{title}</h3>
                 {badge}
             </div>
-            <div className={`text-gray-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
-                <ChevronDownIcon size={16} />
+            <div className={`text-gray-600 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+                <ChevronDownIcon size={14} />
             </div>
         </button>
         <div
@@ -79,6 +85,10 @@ interface LeftSidebarProps {
   width: number;
   isResizing: boolean;
   onResizeStart: (e: React.MouseEvent) => void;
+  
+  viewMode: 'agent' | 'studio';
+  activeStudioTab: StudioTab;
+  onStudioTabChange: (tab: StudioTab) => void;
 }
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({
@@ -98,7 +108,10 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onSaveGeminiSettings,
   width,
   isResizing,
-  onResizeStart
+  onResizeStart,
+  viewMode,
+  activeStudioTab,
+  onStudioTabChange
 }) => {
   const [name, setName] = useState('');
   const [endpoint, setEndpoint] = useState('');
@@ -113,6 +126,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
     tools: true,
     gemini: false,
     addProject: false,
+    studioNav: true,
   });
 
   const [expandedToolCategories, setExpandedToolCategories] = useState<{ [key: string]: boolean }>({});
@@ -147,17 +161,37 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   const handleToolChange = (toolName: string, isChecked: boolean) => {
     onToolsChange({ ...activeTools, [toolName]: isChecked });
   };
-
-  const handleCategoryToolsChange = (categoryTools: string[], isChecked: boolean) => {
-    const newActiveTools = { ...activeTools };
-    categoryTools.forEach(toolName => {
-        newActiveTools[toolName] = isChecked;
-    });
-    onToolsChange(newActiveTools);
-  };
     
   const toggleToolCategory = (category: string) => {
     setExpandedToolCategories(prev => ({ ...prev, [category]: !prev[category] }));
+  };
+
+  const handleEnableAllTools = () => {
+    const newTools: { [key: string]: boolean } = { search: true };
+    Object.values(toolDefinitionGroups).flat().forEach(tool => {
+        newTools[tool.name] = true;
+    });
+    onToolsChange(newTools);
+  };
+
+  const handleDisableAllTools = () => {
+    const newTools: { [key: string]: boolean } = { search: false };
+    Object.values(toolDefinitionGroups).flat().forEach(tool => {
+        newTools[tool.name] = false;
+    });
+    onToolsChange(newTools);
+  };
+
+  const handleEnableCategory = (tools: any[]) => {
+    const newTools = { ...activeTools };
+    tools.forEach(t => newTools[t.name] = true);
+    onToolsChange(newTools);
+  };
+
+  const handleDisableCategory = (tools: any[]) => {
+    const newTools = { ...activeTools };
+    tools.forEach(t => newTools[t.name] = false);
+    onToolsChange(newTools);
   };
   
   const hasGeminiSettingsChanged = (apiKeyInput.trim() !== (geminiApiKey || '')) || (modelInput !== geminiModel) || (thinkingInput !== geminiThinkingEnabled);
@@ -176,10 +210,19 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   };
 
   const getIndicatorInfo = (checked: number, total: number) => {
-    if (checked === 0) return { className: 'bg-gray-600', title: 'None' };
+    if (checked === 0) return { className: 'bg-gray-700', title: 'None' };
     if (checked === total && total > 0) return { className: 'bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]', title: 'All' };
     return { className: 'bg-yellow-500', title: 'Partial' };
   };
+
+  const studioTabs: { id: StudioTab, label: string, icon: React.ReactNode }[] = [
+    { id: 'overview', label: 'Overview', icon: <DashboardIcon /> },
+    { id: 'database', label: 'Databases', icon: <DatabaseIcon /> },
+    { id: 'storage', label: 'Storage', icon: <StorageIcon /> },
+    { id: 'functions', label: 'Functions', icon: <FunctionIcon /> },
+    { id: 'users', label: 'Auth & Users', icon: <TeamIcon /> },
+    { id: 'teams', label: 'Teams', icon: <TeamIcon /> },
+  ];
 
   return (
     <>
@@ -192,18 +235,17 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       />
       <aside
         style={{
-          width: `${width}px`,
-          borderRightWidth: width === 0 ? '0px' : undefined
+          width: isOpen ? `${width}px` : '0px',
         }}
         className={`
-          bg-gray-900/95 backdrop-blur-md flex flex-col border-r border-white/5
-          transition-transform md:transition-width duration-300 ease-in-out flex-shrink-0
+          flex flex-col
+          transition-[width] duration-300 ease-in-out flex-shrink-0
           fixed md:relative inset-y-0 left-0 z-30 md:z-auto
-          transform ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:transform-none
           ${isResizing ? 'transition-none select-none' : ''}
+          ${isOpen ? 'mr-0' : 'mr-0 overflow-hidden'}
         `}
       >
-        <div className="flex flex-col h-full w-full overflow-hidden">
+        <div className="flex flex-col h-full w-full overflow-hidden bg-gray-900/80 backdrop-blur-xl border border-white/5 rounded-2xl shadow-2xl relative">
             {/* Header within sidebar for mobile or branding */}
             <div className="p-4 md:hidden border-b border-gray-800 flex justify-between items-center">
                 <span className="font-bold text-gray-100">Menu</span>
@@ -213,18 +255,19 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar">
+            {/* PROJECTS SECTION - Always Visible */}
             <CollapsibleSection
               title="Projects"
               icon={<ProjectsIcon />}
               isExpanded={expandedSections.projects}
               onToggle={() => toggleSection('projects')}
               badge={
-                projects.length > 0 && <span className="bg-gray-800 text-gray-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-gray-700">{projects.length}</span>
+                projects.length > 0 && <span className="bg-gray-800 text-gray-400 text-[10px] font-bold px-1.5 py-0.5 rounded border border-gray-700">{projects.length}</span>
               }
             >
               <ul className="space-y-1">
                 {projects.length === 0 && (
-                   <div className="text-center p-6 text-sm text-gray-500 border border-dashed border-gray-800 rounded-lg">
+                   <div className="text-center p-6 text-xs text-gray-600 border border-dashed border-gray-800 rounded-lg">
                         No projects found.
                    </div>
                 )}
@@ -232,15 +275,15 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                   <li
                     key={p.$id}
                     onClick={() => onSelect(p)}
-                    className={`group flex items-center justify-between gap-2 p-3 rounded-lg transition-all cursor-pointer border border-transparent ${
+                    className={`group flex items-center justify-between gap-2 p-2 rounded-lg transition-all cursor-pointer border border-transparent ${
                       activeProject?.$id === p.$id
-                        ? 'bg-cyan-950/30 border-cyan-500/30 shadow-[0_0_15px_rgba(8,145,178,0.1)]'
-                        : 'hover:bg-gray-800/50 hover:border-gray-700'
+                        ? 'bg-cyan-950/40 border-cyan-500/20 shadow-sm text-cyan-200'
+                        : 'hover:bg-gray-800/50 hover:border-gray-700/50 text-gray-400'
                     }`}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium truncate transition-colors ${activeProject?.$id === p.$id ? 'text-cyan-400' : 'text-gray-300 group-hover:text-gray-100'}`}>{p.name}</p>
-                      <p className="text-xs text-gray-500 truncate font-mono">{p.projectId}</p>
+                      <p className={`text-sm font-medium truncate transition-colors ${activeProject?.$id === p.$id ? 'text-cyan-300' : 'group-hover:text-gray-200'}`}>{p.name}</p>
+                      <p className="text-[10px] text-gray-600 truncate font-mono mt-0.5">{p.projectId}</p>
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); onDelete(p.$id, p.name); }}
@@ -254,154 +297,216 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
               </ul>
             </CollapsibleSection>
 
-            <CollapsibleSection
-              title="Tools"
-              icon={<ToolsIcon />}
-              isExpanded={expandedSections.tools}
-              onToggle={() => toggleSection('tools')}
-            >
-              <div className="space-y-3">
-                <div className="bg-gray-800/30 rounded-lg border border-gray-800">
-                    <ToolToggle
-                        label="Web Search"
-                        isChecked={activeTools['search'] ?? false}
-                        onChange={(isChecked) => handleToolChange('search', isChecked)}
-                    />
-                </div>
+            {/* STUDIO MODE NAVIGATION */}
+            {viewMode === 'studio' && (
+                <CollapsibleSection
+                    title="Studio Navigation"
+                    icon={<DashboardIcon />}
+                    isExpanded={expandedSections.studioNav}
+                    onToggle={() => toggleSection('studioNav')}
+                >
+                     <nav className="space-y-1">
+                        {studioTabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => onStudioTabChange(tab.id)}
+                                className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
+                                    activeStudioTab === tab.id 
+                                    ? 'bg-purple-900/30 text-purple-300 border border-purple-500/20 shadow-[0_0_10px_rgba(168,85,247,0.1)]' 
+                                    : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200 border border-transparent'
+                                }`}
+                            >
+                                <span className={activeStudioTab === tab.id ? 'text-purple-400' : 'text-gray-500'}>{tab.icon}</span>
+                                <span>{tab.label}</span>
+                            </button>
+                        ))}
+                    </nav>
+                </CollapsibleSection>
+            )}
 
-                {Object.entries(toolDefinitionGroups).map(([category, tools]) => {
-                    const categoryToolNames = tools.map(t => t.name);
-                    const checkedCount = categoryToolNames.filter(tool => activeTools[tool]).length;
-                    const totalCount = categoryToolNames.length;
-                    const isExpanded = expandedToolCategories[category] ?? false;
-                    const indicator = getIndicatorInfo(checkedCount, totalCount);
-
-                    return (
-                        <div key={category} className="bg-gray-800/30 rounded-lg border border-gray-800 overflow-hidden">
-                            <div className="group px-3 py-2 cursor-pointer hover:bg-gray-800/50 transition-colors" onClick={() => toggleToolCategory(category)}>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2.5">
-                                        <span className={`w-2 h-2 rounded-full transition-all duration-300 ${indicator.className}`} />
-                                        <span className="text-sm font-medium capitalize text-gray-300">{category}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] text-gray-500 font-mono">{checkedCount}/{totalCount}</span>
-                                        <div className={`text-gray-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
-                                            <ChevronDownIcon size={14} />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex justify-end gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity h-0 group-hover:h-auto">
-                                     <button onClick={(e) => {e.stopPropagation(); handleCategoryToolsChange(categoryToolNames, true);}} className="text-[10px] uppercase font-bold text-cyan-500 hover:text-cyan-400">All</button>
-                                     <button onClick={(e) => {e.stopPropagation(); handleCategoryToolsChange(categoryToolNames, false);}} className="text-[10px] uppercase font-bold text-gray-500 hover:text-gray-400">None</button>
-                                </div>
-                            </div>
-                            {isExpanded && (
-                                <div className="border-t border-gray-800 p-1 bg-gray-900/20">
-                                    {tools.map(tool => (
-                                        <ToolToggle
-                                            key={tool.name}
-                                            label={tool.name}
-                                            isChecked={activeTools[tool.name] ?? false}
-                                            onChange={(isChecked) => handleToolChange(tool.name, isChecked)}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-              </div>
-            </CollapsibleSection>
-
-            <CollapsibleSection
-                title="Settings"
-                icon={<SettingsIcon />}
-                isExpanded={expandedSections.gemini}
-                onToggle={() => toggleSection('gemini')}
-            >
-                <form onSubmit={handleSaveGeminiSettings} className="flex flex-col gap-4">
-                    <div>
-                      <label htmlFor="gemini-model-select" className="text-xs font-semibold text-gray-400 mb-2 block uppercase tracking-wider">Model</label>
-                      <div className="relative">
-                          <select
-                            id="gemini-model-select"
-                            value={modelInput}
-                            onChange={e => setModelInput(e.target.value)}
-                            className="w-full bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2.5 appearance-none"
-                          >
-                            {geminiModels.map(model => (
-                              <option key={model} value={model}>{model}</option>
-                            ))}
-                          </select>
-                          <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-400">
-                              <ChevronDownIcon size={16} />
-                          </div>
-                      </div>
+            {/* AGENT MODE TOOLS & SETTINGS */}
+            {viewMode === 'agent' && (
+                <>
+                    <CollapsibleSection
+                    title="Tools"
+                    icon={<ToolsIcon />}
+                    isExpanded={expandedSections.tools}
+                    onToggle={() => toggleSection('tools')}
+                    >
+                    <div className="flex gap-2 mb-3">
+                        <button 
+                            type="button"
+                            onClick={handleEnableAllTools}
+                            className="flex-1 py-1.5 rounded bg-gray-800 border border-gray-700 hover:bg-cyan-900/30 hover:border-cyan-500/30 hover:text-cyan-200 text-xs text-gray-400 transition-all font-medium"
+                        >
+                            Enable All
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={handleDisableAllTools}
+                            className="flex-1 py-1.5 rounded bg-gray-800 border border-gray-700 hover:bg-red-900/20 hover:border-red-500/30 hover:text-red-200 text-xs text-gray-400 transition-all font-medium"
+                        >
+                            Disable All
+                        </button>
                     </div>
 
-                    {modelInput === 'gemini-2.5-flash' && (
-                        <div className="bg-gray-800/50 p-2 rounded-lg border border-gray-700/50">
+                    <div className="space-y-2">
+                        <div className="bg-gray-900/30 rounded-lg border border-gray-800/50">
                             <ToolToggle
-                                label="Deep Thinking"
-                                isChecked={thinkingInput}
-                                onChange={setThinkingInput}
+                                label="Web Search"
+                                isChecked={activeTools['search'] ?? false}
+                                onChange={(isChecked) => handleToolChange('search', isChecked)}
                             />
                         </div>
-                    )}
 
-                    <div>
-                      <label htmlFor="gemini-api-key-input" className="text-xs font-semibold text-gray-400 mb-2 block uppercase tracking-wider">Custom API Key</label>
-                      <div className="relative">
-                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500"><KeyIcon /></span>
-                          <input 
-                              id="gemini-api-key-input"
-                              type="password" 
-                              value={apiKeyInput} 
-                              onChange={e => setApiKeyInput(e.target.value)} 
-                              placeholder="Override default key" 
-                              className="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full pl-10 p-2.5 placeholder-gray-600" 
-                          />
-                      </div>
+                        {Object.entries(toolDefinitionGroups).map(([category, tools]) => {
+                            const categoryToolNames = tools.map(t => t.name);
+                            const checkedCount = categoryToolNames.filter(tool => activeTools[tool]).length;
+                            const totalCount = categoryToolNames.length;
+                            const isExpanded = expandedToolCategories[category] ?? false;
+                            const indicator = getIndicatorInfo(checkedCount, totalCount);
+
+                            return (
+                                <div key={category} className="bg-gray-900/30 rounded-lg border border-gray-800/50 overflow-hidden">
+                                    <div className="group px-3 py-2 cursor-pointer hover:bg-white/5 transition-colors" onClick={() => toggleToolCategory(category)}>
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2.5">
+                                                <span className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${indicator.className}`} />
+                                                <span className="text-xs font-medium capitalize text-gray-400 group-hover:text-gray-300">{category}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="hidden group-hover:flex items-center gap-1 mr-1">
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); handleEnableCategory(tools); }}
+                                                        className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 hover:bg-cyan-900/50 text-gray-500 hover:text-cyan-400 border border-gray-700 transition-colors"
+                                                        title="Enable all in category"
+                                                    >
+                                                        On
+                                                    </button>
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); handleDisableCategory(tools); }}
+                                                        className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 hover:bg-red-900/50 text-gray-500 hover:text-red-400 border border-gray-700 transition-colors"
+                                                        title="Disable all in category"
+                                                    >
+                                                        Off
+                                                    </button>
+                                                </div>
+                                                <span className="text-[10px] text-gray-600 font-mono">{checkedCount}/{totalCount}</span>
+                                                <div className={`text-gray-600 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+                                                    <ChevronDownIcon size={12} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {isExpanded && (
+                                        <div className="border-t border-gray-800/50 bg-black/20 p-1">
+                                            {tools.map(tool => (
+                                                <ToolToggle
+                                                    key={tool.name}
+                                                    label={tool.name}
+                                                    isChecked={activeTools[tool.name] ?? false}
+                                                    onChange={(isChecked) => handleToolChange(tool.name, isChecked)}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
-                    
-                    <div className="flex gap-2 pt-2">
-                        <button 
-                            type="button" 
-                            onClick={handleResetGeminiSettings}
-                            disabled={!hasGeminiSettingsChanged}
-                            className="flex-1 py-2 px-3 text-sm font-medium text-gray-400 bg-gray-800 rounded-lg border border-gray-700 hover:bg-gray-700 hover:text-white transition-colors disabled:opacity-50"
-                        >
-                            Reset
-                        </button>
-                        <button 
-                            type="submit"
-                            className="flex-1 py-2 px-3 text-sm font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-500 shadow-lg shadow-cyan-900/20 transition-all disabled:opacity-50 disabled:shadow-none"
-                            disabled={!hasGeminiSettingsChanged}
-                        >
-                            Save Changes
-                        </button>
-                    </div>
-                </form>
-            </CollapsibleSection>
+                    </CollapsibleSection>
+
+                    <CollapsibleSection
+                        title="Configuration"
+                        icon={<SettingsIcon />}
+                        isExpanded={expandedSections.gemini}
+                        onToggle={() => toggleSection('gemini')}
+                    >
+                        <form onSubmit={handleSaveGeminiSettings} className="flex flex-col gap-4">
+                            <div>
+                            <label htmlFor="gemini-model-select" className="text-[10px] font-semibold text-gray-500 mb-1.5 block uppercase tracking-wider">Model</label>
+                            <div className="relative">
+                                <select
+                                    id="gemini-model-select"
+                                    value={modelInput}
+                                    onChange={e => setModelInput(e.target.value)}
+                                    className="w-full bg-gray-900/50 border border-gray-700 text-gray-300 text-xs rounded-lg focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 block p-2 appearance-none outline-none"
+                                >
+                                    {geminiModels.map(model => (
+                                    <option key={model} value={model}>{model}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
+                                    <ChevronDownIcon size={14} />
+                                </div>
+                            </div>
+                            </div>
+
+                            {modelInput === 'gemini-2.5-flash' && (
+                                <div className="bg-gray-900/50 p-1.5 rounded-lg border border-gray-800">
+                                    <ToolToggle
+                                        label="Deep Thinking"
+                                        isChecked={thinkingInput}
+                                        onChange={setThinkingInput}
+                                    />
+                                </div>
+                            )}
+
+                            <div>
+                            <label htmlFor="gemini-api-key-input" className="text-[10px] font-semibold text-gray-500 mb-1.5 block uppercase tracking-wider">API Key Override</label>
+                            <div className="relative">
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-600"><KeyIcon /></span>
+                                <input 
+                                    id="gemini-api-key-input"
+                                    type="password" 
+                                    value={apiKeyInput} 
+                                    onChange={e => setApiKeyInput(e.target.value)} 
+                                    placeholder="Use system default" 
+                                    className="bg-gray-900/50 border border-gray-700 text-gray-300 text-xs rounded-lg focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 block w-full pl-9 p-2 placeholder-gray-700 outline-none" 
+                                />
+                            </div>
+                            </div>
+                            
+                            <div className="flex gap-2 pt-2">
+                                <button 
+                                    type="button" 
+                                    onClick={handleResetGeminiSettings}
+                                    disabled={!hasGeminiSettingsChanged}
+                                    className="flex-1 py-1.5 px-3 text-xs font-medium text-gray-400 bg-gray-800 rounded-lg hover:bg-gray-700 hover:text-white transition-colors disabled:opacity-50"
+                                >
+                                    Reset
+                                </button>
+                                <button 
+                                    type="submit"
+                                    className="flex-1 py-1.5 px-3 text-xs font-medium text-white bg-cyan-600 rounded-lg hover:bg-cyan-500 shadow-lg shadow-cyan-900/20 transition-all disabled:opacity-50 disabled:shadow-none"
+                                    disabled={!hasGeminiSettingsChanged}
+                                >
+                                    Save
+                                </button>
+                            </div>
+                        </form>
+                    </CollapsibleSection>
+                </>
+            )}
           </div>
 
-          <div className="p-4 border-t border-gray-800 bg-gray-900/50">
+          <div className="p-3 bg-gray-950/30 border-t border-gray-800/30">
              <CollapsibleSection
-                title="Add Project"
+                title="New Project"
                 icon={<AddIcon />}
                 isExpanded={expandedSections.addProject}
                 onToggle={() => toggleSection('addProject')}
                 className="border-none"
+                transparent
             >
-                <form onSubmit={handleSave} className="flex flex-col gap-3">
-                    <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Project Name" className="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5 placeholder-gray-500" required />
-                    <input type="url" value={endpoint} onChange={e => setEndpoint(e.target.value)} placeholder="Endpoint (https://...)" className="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5 placeholder-gray-500" required />
-                    <input type="text" value={projectId} onChange={e => setProjectId(e.target.value)} placeholder="Project ID" className="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5 placeholder-gray-500 font-mono" required />
-                    <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="API Key" className="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5 placeholder-gray-500 font-mono" required />
-                    <button type="submit" className="w-full mt-2 py-2.5 px-3 text-sm font-semibold text-white bg-cyan-600 rounded-lg hover:bg-cyan-500 transition-colors flex justify-center items-center gap-2 shadow-lg shadow-cyan-900/20">
+                <form onSubmit={handleSave} className="flex flex-col gap-2.5">
+                    <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Project Name" className="bg-gray-900/50 border border-gray-700 text-gray-200 text-xs rounded-lg focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 block w-full p-2 placeholder-gray-600 outline-none" required />
+                    <input type="url" value={endpoint} onChange={e => setEndpoint(e.target.value)} placeholder="Endpoint URL" className="bg-gray-900/50 border border-gray-700 text-gray-200 text-xs rounded-lg focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 block w-full p-2 placeholder-gray-600 outline-none" required />
+                    <input type="text" value={projectId} onChange={e => setProjectId(e.target.value)} placeholder="Project ID" className="bg-gray-900/50 border border-gray-700 text-gray-200 text-xs rounded-lg focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 block w-full p-2 placeholder-gray-600 font-mono outline-none" required />
+                    <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="API Key" className="bg-gray-900/50 border border-gray-700 text-gray-200 text-xs rounded-lg focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 block w-full p-2 placeholder-gray-600 font-mono outline-none" required />
+                    <button type="submit" className="w-full mt-1 py-2 px-3 text-xs font-semibold text-white bg-gradient-to-r from-cyan-600 to-blue-600 rounded-lg hover:from-cyan-500 hover:to-blue-500 transition-colors flex justify-center items-center gap-2 shadow-lg shadow-cyan-900/20">
                         <AddIcon />
-                        Create Project
+                        Create
                     </button>
                 </form>
             </CollapsibleSection>
@@ -412,10 +517,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
         {isOpen && (
             <div
                 onMouseDown={onResizeStart}
-                className={`
-                    hidden md:block absolute top-0 right-0 h-full w-1 cursor-col-resize hover:bg-cyan-500/50 transition-colors z-50
-                    ${isResizing ? 'bg-cyan-500' : 'bg-transparent'}
-                `}
+                className="hidden md:block absolute top-0 -right-6 h-full w-6 cursor-col-resize z-50 select-none"
             />
         )}
       </aside>

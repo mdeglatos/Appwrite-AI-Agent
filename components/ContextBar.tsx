@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { Database, Collection, Bucket, AppwriteFunction } from '../types';
-import { LoadingSpinnerIcon, RefreshIcon, ChevronDownIcon } from './Icons';
+import { LoadingSpinnerIcon, RefreshIcon, ChevronDownIcon, AddIcon } from './Icons';
 
 interface ContextBarProps {
     databases: Database[];
@@ -17,38 +17,77 @@ interface ContextBarProps {
     onFunctionSelect: (fn: AppwriteFunction | null) => void;
     isLoading: boolean;
     onRefresh: () => void;
+    onAddFunction?: () => void;
 }
 
-interface SelectorProps {
-    label: string;
+// Custom Dropdown Component
+interface CustomDropdownProps {
     value: string;
-    onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
+    onSelect: (id: string) => void;
     options: { $id: string; name: string }[];
     placeholder: string;
     disabled?: boolean;
 }
 
-const Selector: React.FC<SelectorProps> = ({ label, value, onChange, options, placeholder, disabled = false }) => {
+const CustomDropdown: React.FC<CustomDropdownProps> = ({ value, onSelect, options, placeholder, disabled }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const selectedItem = options.find(o => o.$id === value);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     return (
-        <div className="relative min-w-[160px] max-w-[200px] flex-1">
-            <label htmlFor={label} className="sr-only">{placeholder}</label>
-            <select
-                id={label}
-                value={value}
-                onChange={onChange}
+        <div className="relative" ref={containerRef}>
+            <button
+                onClick={() => !disabled && setIsOpen(!isOpen)}
+                className={`
+                    flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-200 min-w-[140px] justify-between
+                    ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                    ${value 
+                        ? 'bg-cyan-950/40 border-cyan-500/30 text-cyan-200 shadow-[0_0_10px_rgba(8,145,178,0.1)] hover:bg-cyan-900/50' 
+                        : 'bg-gray-900/50 border-gray-700/50 text-gray-400 hover:border-gray-500 hover:text-gray-300'}
+                `}
                 disabled={disabled}
-                className="w-full appearance-none bg-gray-800/50 hover:bg-gray-800 border border-white/5 hover:border-white/10 rounded-lg py-1.5 pl-3 pr-8 text-xs text-gray-300 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition-colors disabled:opacity-50 truncate cursor-pointer"
             >
-                <option value="">{placeholder}</option>
-                {options.map(opt => (
-                    <option key={opt.$id} value={opt.$id}>
-                        {opt.name}
-                    </option>
-                ))}
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
-                <ChevronDownIcon size={12} />
-            </div>
+                <span className="text-xs font-medium truncate max-w-[120px]">
+                    {selectedItem ? selectedItem.name : placeholder}
+                </span>
+                <ChevronDownIcon size={12} className={value ? 'text-cyan-500' : 'text-gray-600'} />
+            </button>
+
+            {isOpen && (
+                <div className="absolute top-full mt-2 left-0 w-64 max-h-60 overflow-y-auto bg-gray-900/95 backdrop-blur-xl border border-gray-700 rounded-xl shadow-2xl z-50 custom-scrollbar p-1">
+                    {options.length > 0 ? (
+                        <>
+                            <button
+                                onClick={() => { onSelect(''); setIsOpen(false); }}
+                                className="w-full text-left px-3 py-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/5 rounded-lg transition-colors italic"
+                            >
+                                None
+                            </button>
+                            {options.map(opt => (
+                                <button
+                                    key={opt.$id}
+                                    onClick={() => { onSelect(opt.$id); setIsOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors mb-0.5 ${value === opt.$id ? 'bg-cyan-900/30 text-cyan-300 font-medium' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
+                                >
+                                    {opt.name}
+                                </button>
+                            ))}
+                        </>
+                    ) : (
+                        <div className="px-3 py-3 text-xs text-gray-500 text-center italic">No items found</div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
@@ -68,60 +107,71 @@ export const ContextBar: React.FC<ContextBarProps> = ({
     onFunctionSelect,
     isLoading,
     onRefresh,
+    onAddFunction,
 }) => {
 
-    const handleDbChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const dbId = e.target.value;
-        onDatabaseSelect(databases.find(d => d.$id === dbId) || null);
-    };
-
-    const handleCollectionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const collectionId = e.target.value;
-        onCollectionSelect(collections.find(c => c.$id === collectionId) || null);
-    };
-
-    const handleBucketChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const bucketId = e.target.value;
-        onBucketSelect(buckets.find(b => b.$id === bucketId) || null);
-    };
-
-    const handleFunctionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const funcId = e.target.value;
-        onFunctionSelect(functions.find(f => f.$id === funcId) || null);
-    };
-
     return (
-        <div className="w-full border-b border-white/5 bg-gray-900/40 backdrop-blur-sm sticky top-0 z-10">
-            <div className="max-w-7xl mx-auto px-4 py-2 flex items-center gap-3 overflow-x-auto custom-scrollbar">
-                <div className="flex items-center gap-2 text-xs font-medium text-gray-500 mr-1 flex-shrink-0">
-                    <button
-                        onClick={onRefresh}
-                        disabled={isLoading}
-                        className="p-1.5 rounded-md hover:bg-gray-700/50 hover:text-cyan-400 transition-colors disabled:animate-spin"
-                        title="Refresh Data"
-                    >
-                        {isLoading ? <LoadingSpinnerIcon /> : <RefreshIcon size={14} />}
-                    </button>
-                </div>
+        <div className="absolute top-24 left-0 right-0 flex justify-center py-2 pointer-events-none z-10">
+            <div className="pointer-events-auto flex items-center gap-2 px-3 py-2 bg-gray-950/40 backdrop-blur-lg border border-white/10 rounded-full shadow-lg overflow-x-visible max-w-[95%]">
+                <button
+                    onClick={onRefresh}
+                    disabled={isLoading}
+                    className="p-1.5 rounded-full hover:bg-gray-800 text-gray-500 hover:text-cyan-400 transition-colors disabled:animate-spin"
+                    title="Refresh Data"
+                >
+                    {isLoading ? <LoadingSpinnerIcon size={14} /> : <RefreshIcon size={14} />}
+                </button>
                 
-                <div className="h-4 w-px bg-gray-700/50 flex-shrink-0"></div>
+                <div className="h-4 w-px bg-gray-700/50 mx-1"></div>
 
-                <Selector
-                    label="database-select" value={selectedDatabase?.$id || ''}
-                    onChange={handleDbChange} options={databases} placeholder="Database" disabled={isLoading}
+                <CustomDropdown
+                    value={selectedDatabase?.$id || ''}
+                    onSelect={(id) => onDatabaseSelect(databases.find(d => d.$id === id) || null)} 
+                    options={databases} 
+                    placeholder="Database" 
+                    disabled={isLoading}
                 />
-                <Selector
-                    label="collection-select" value={selectedCollection?.$id || ''}
-                    onChange={handleCollectionChange} options={collections} placeholder="Collection" disabled={isLoading || !selectedDatabase}
+                
+                {selectedDatabase && (
+                    <CustomDropdown
+                        value={selectedCollection?.$id || ''}
+                        onSelect={(id) => onCollectionSelect(collections.find(c => c.$id === id) || null)} 
+                        options={collections} 
+                        placeholder="Collection" 
+                        disabled={isLoading}
+                    />
+                )}
+                
+                <div className="h-4 w-px bg-gray-700/50 mx-1"></div>
+
+                <CustomDropdown
+                    value={selectedBucket?.$id || ''}
+                    onSelect={(id) => onBucketSelect(buckets.find(b => b.$id === id) || null)} 
+                    options={buckets} 
+                    placeholder="Bucket" 
+                    disabled={isLoading}
                 />
-                <Selector
-                    label="bucket-select" value={selectedBucket?.$id || ''}
-                    onChange={handleBucketChange} options={buckets} placeholder="Storage Bucket" disabled={isLoading}
-                />
-                <Selector
-                    label="function-select" value={selectedFunction?.$id || ''}
-                    onChange={handleFunctionChange} options={functions} placeholder="Function" disabled={isLoading}
-                />
+                
+                <div className="h-4 w-px bg-gray-700/50 mx-1"></div>
+                
+                <div className="flex items-center gap-1">
+                    <CustomDropdown
+                        value={selectedFunction?.$id || ''}
+                        onSelect={(id) => onFunctionSelect(functions.find(f => f.$id === id) || null)} 
+                        options={functions} 
+                        placeholder="Function" 
+                        disabled={isLoading}
+                    />
+                     {onAddFunction && (
+                        <button
+                            onClick={onAddFunction}
+                            className="p-1.5 bg-gray-800/50 hover:bg-gray-700 border border-gray-700 rounded-full text-gray-400 hover:text-white transition-colors"
+                            title="Create New Function"
+                        >
+                            <AddIcon size={14} />
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );

@@ -32,12 +32,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
 
         // Styled wrapper for code blocks
         const wrapper = document.createElement('div');
-        wrapper.className = 'code-block-wrapper relative group rounded-lg overflow-hidden my-4 border border-gray-700/50 shadow-sm';
+        wrapper.className = 'code-block-wrapper relative group rounded-xl overflow-hidden my-4 border border-gray-700/50 shadow-md bg-[#0d1117]';
         preEl.parentNode?.insertBefore(wrapper, preEl);
         
         // Header for code block
         const header = document.createElement('div');
-        header.className = 'flex items-center justify-between px-4 py-2 bg-gray-800/80 border-b border-gray-700/50 text-xs text-gray-400 select-none';
+        header.className = 'flex items-center justify-between px-4 py-2 bg-gray-800/50 border-b border-gray-700/50 text-xs text-gray-400 select-none backdrop-blur-sm';
         const lang = codeEl.className.replace('language-', '') || 'code';
         header.textContent = lang;
         
@@ -56,21 +56,20 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         wrapper.appendChild(header);
         wrapper.appendChild(preEl);
         
-        // Style the pre element to fit nicely
-        preEl.className += " !m-0 !bg-gray-900/90 !p-4 overflow-x-auto text-sm font-mono";
+        preEl.className += " !m-0 !bg-transparent !p-4 overflow-x-auto text-sm font-mono";
       });
     }
   }, [message.content, message.role, message.id]);
 
   return (
-    <div className={`flex gap-4 animate-slide-up ${isUser ? 'flex-row-reverse' : 'flex-row'} max-w-4xl mx-auto w-full`}>
+    <div className={`flex gap-5 animate-slide-up ${isUser ? 'flex-row-reverse' : 'flex-row'} w-full group`}>
       {/* Avatar */}
-      <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-lg z-10 ${
+      <div className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center shadow-lg z-10 ${
           isUser 
-            ? 'bg-gradient-to-br from-cyan-600 to-blue-700 text-white' 
-            : 'bg-gray-800 border border-gray-700 text-cyan-400'
+            ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white' 
+            : 'bg-gray-800/80 backdrop-blur border border-gray-700 text-cyan-400'
       }`}>
-        {isUser ? <UserIcon /> : <BotIcon />}
+        {isUser ? <UserIcon size={14} /> : <BotIcon size={18} />}
       </div>
 
       {/* Message Bubble */}
@@ -80,7 +79,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         {isUser && message.files && message.files.length > 0 && (
             <div className="mb-2 flex flex-wrap justify-end gap-2">
                 {message.files.map((file, index) => (
-                    <div key={index} className="px-3 py-2 bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg flex items-center gap-2 text-xs text-gray-300 shadow-sm">
+                    <div key={index} className="px-3 py-2 bg-gray-900/60 backdrop-blur-sm border border-gray-700 rounded-lg flex items-center gap-2 text-xs text-gray-300 shadow-sm">
                         <AttachmentIcon size={14} />
                         <span className="truncate max-w-[150px]">{file.name}</span>
                     </div>
@@ -89,23 +88,24 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         )}
 
         <div
-          className={`px-5 py-4 rounded-2xl shadow-sm border backdrop-blur-sm ${
+          className={`px-6 py-4 shadow-lg backdrop-blur-md ${
             isUser
-              ? 'bg-cyan-600/10 border-cyan-500/20 text-gray-100 rounded-tr-none'
-              : 'bg-gray-800/40 border-white/5 text-gray-200 rounded-tl-none'
+              ? 'bg-gradient-to-br from-cyan-900/40 to-blue-900/40 border border-cyan-500/20 text-gray-100 rounded-2xl rounded-tr-sm'
+              : 'bg-gray-900/60 border border-white/5 text-gray-200 rounded-2xl rounded-tl-sm'
           }`}
         >
             {message.content ? (
                 isUser ? (
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+                    <p className="whitespace-pre-wrap text-[15px] leading-relaxed tracking-wide">{message.content}</p>
                 ) : (
                     <div 
                         ref={contentRef}
                         className="prose prose-invert prose-sm max-w-none 
-                        prose-p:leading-relaxed prose-a:text-cyan-400 prose-a:no-underline hover:prose-a:underline
-                        prose-headings:text-gray-100 prose-headings:font-semibold
+                        prose-p:leading-relaxed prose-p:text-gray-300 prose-p:text-[15px]
+                        prose-a:text-cyan-400 prose-a:no-underline hover:prose-a:underline
+                        prose-headings:text-gray-100 prose-headings:font-bold
                         prose-ul:my-2 prose-li:my-0.5
-                        prose-strong:text-cyan-300"
+                        prose-strong:text-cyan-200"
                         dangerouslySetInnerHTML={{ __html: marked.parse(message.content) as string }} 
                     />
                 )
@@ -123,7 +123,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                         href={chunk.web!.uri}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-900/50 border border-gray-800 rounded-full text-xs text-gray-400 hover:text-cyan-400 hover:border-cyan-500/30 transition-all"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-900/40 border border-gray-800/50 rounded-full text-xs text-gray-400 hover:text-cyan-400 hover:border-cyan-500/30 transition-all"
                     >
                         <SourcesIcon />
                         <span className="truncate max-w-[200px]">{chunk.web!.title}</span>

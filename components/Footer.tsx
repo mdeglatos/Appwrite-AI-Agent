@@ -7,7 +7,7 @@ interface FooterProps {
     onFileSelect: (files: File[] | null) => void;
     isLoading: boolean;
     isDisabled: boolean;
-    activeProject: any; // Using `any` to avoid full AppwriteProject type dependency here
+    activeProject: any; 
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -19,15 +19,17 @@ export const Footer: React.FC<FooterProps> = ({
     activeProject
 }) => {
     return (
-        <footer className="p-4 border-t border-gray-700 bg-gray-800 shrink-0">
-            <ChatInput
-                onSubmit={onSubmit}
-                selectedFiles={selectedFiles}
-                onFileSelect={onFileSelect}
-                isLoading={isLoading}
-                isDisabled={isDisabled}
-                placeholder={activeProject ? "Type a command, paste an image, or drop files..." : "Please select a project to start..."}
-            />
+        <footer className="absolute bottom-6 left-0 right-0 px-4 pointer-events-none z-20 flex justify-center">
+            <div className="pointer-events-auto w-full max-w-3xl">
+                <ChatInput
+                    onSubmit={onSubmit}
+                    selectedFiles={selectedFiles}
+                    onFileSelect={onFileSelect}
+                    isLoading={isLoading}
+                    isDisabled={isDisabled}
+                    placeholder={activeProject ? "Ask AI to manage resources or write code..." : "Select a project..."}
+                />
+            </div>
         </footer>
     );
 };

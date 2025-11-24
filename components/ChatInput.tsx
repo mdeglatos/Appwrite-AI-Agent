@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { AttachmentIcon, SendIcon, LoadingSpinnerIcon, CloseIcon, FileIcon } from './Icons';
 
 interface ChatInputProps {
@@ -55,17 +55,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, selectedFiles, o
     const canSubmit = !isDisabled && (!!input.trim() || selectedFiles.length > 0);
 
     return (
-        <div className="max-w-4xl mx-auto w-full px-4 pb-6 pt-2">
-            <form onSubmit={handleFormSubmit} className="relative">
+        <div className="w-full">
+            <form onSubmit={handleFormSubmit} className="relative group">
                 {/* File Preview Area */}
                 {selectedFiles.length > 0 && (
-                    <div className="absolute bottom-full left-0 mb-3 flex flex-wrap gap-2 w-full px-1 animate-fade-in">
+                    <div className="absolute bottom-full left-0 mb-4 flex flex-wrap gap-2 w-full px-1 animate-fade-in">
                         {selectedFiles.map((file, idx) => (
-                            <div key={idx} className="flex items-center gap-2 bg-gray-800/90 backdrop-blur border border-gray-700 px-3 py-2 rounded-lg shadow-lg text-sm text-gray-200">
-                                <FileIcon size={16} />
+                            <div key={idx} className="flex items-center gap-2 bg-gray-900/90 backdrop-blur-xl border border-gray-700/50 px-3 py-2 rounded-xl shadow-xl text-xs text-gray-200">
+                                <FileIcon size={14} className="text-cyan-400" />
                                 <span className="truncate max-w-[150px]">{file.name}</span>
-                                <span className="text-xs text-gray-500">{(file.size / 1024).toFixed(0)}KB</span>
-                                <button onClick={() => handleRemoveFile(file)} className="ml-1 text-gray-400 hover:text-red-400 p-0.5 rounded-full hover:bg-gray-700">
+                                <span className="text-gray-500">{(file.size / 1024).toFixed(0)}KB</span>
+                                <button onClick={() => handleRemoveFile(file)} className="ml-1 text-gray-400 hover:text-red-400 p-0.5 rounded-full hover:bg-gray-700 transition-colors">
                                     <CloseIcon size={14} />
                                 </button>
                             </div>
@@ -74,8 +74,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, selectedFiles, o
                 )}
 
                 <div className={`
-                    relative flex items-end gap-2 bg-gray-900/80 backdrop-blur-xl border rounded-2xl p-2 shadow-2xl transition-all duration-200
-                    ${isDisabled ? 'border-gray-800 opacity-70' : 'border-gray-700 focus-within:border-cyan-500/50 focus-within:ring-1 focus-within:ring-cyan-500/50'}
+                    relative flex items-end gap-2 bg-gray-900/80 backdrop-blur-xl border rounded-3xl p-2 shadow-2xl transition-all duration-300
+                    ${isDisabled ? 'border-gray-800 opacity-60' : 'border-white/10 hover:border-white/20 focus-within:border-cyan-500/50 focus-within:ring-2 focus-within:ring-cyan-500/10 focus-within:bg-gray-900'}
                 `}>
                     <input
                         type="file"
@@ -89,10 +89,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, selectedFiles, o
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isDisabled}
-                        className="p-3 text-gray-400 hover:text-cyan-400 hover:bg-gray-800 rounded-xl transition-colors disabled:cursor-not-allowed"
+                        className="p-3 text-gray-400 hover:text-cyan-400 hover:bg-white/5 rounded-full transition-colors disabled:cursor-not-allowed mb-0.5"
                         title="Attach Files"
                     >
-                        <AttachmentIcon size={20} />
+                        <AttachmentIcon size={22} />
                     </button>
 
                     <textarea
@@ -102,7 +102,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, selectedFiles, o
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder={placeholder}
-                        className="flex-1 bg-transparent py-3 max-h-40 min-h-[44px] focus:outline-none text-gray-100 placeholder-gray-500 resize-none custom-scrollbar text-[15px] leading-relaxed"
+                        className="flex-1 bg-transparent py-3.5 max-h-40 min-h-[52px] focus:outline-none text-gray-100 placeholder-gray-500 resize-none custom-scrollbar text-[15px] leading-relaxed"
                         disabled={isDisabled}
                     />
 
@@ -110,18 +110,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSubmit, selectedFiles, o
                         type="submit"
                         disabled={!canSubmit}
                         className={`
-                            p-3 rounded-xl flex-shrink-0 transition-all duration-200
+                            p-3 rounded-full flex-shrink-0 transition-all duration-300 mb-0.5
                             ${canSubmit 
-                                ? 'bg-cyan-600 text-white hover:bg-cyan-500 shadow-lg shadow-cyan-900/30 transform active:scale-95' 
+                                ? 'bg-gradient-to-br from-cyan-600 to-blue-600 text-white hover:shadow-lg hover:shadow-cyan-500/20 transform active:scale-95' 
                                 : 'bg-gray-800 text-gray-600 cursor-not-allowed'}
                         `}
                     >
-                        {isLoading ? <LoadingSpinnerIcon /> : <SendIcon />}
+                        {isLoading ? <LoadingSpinnerIcon /> : <SendIcon size={20} />}
                     </button>
-                </div>
-                
-                <div className="text-center mt-2">
-                    <p className="text-[10px] text-gray-600">AI can make mistakes. Check important info.</p>
                 </div>
             </form>
         </div>

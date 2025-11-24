@@ -1,6 +1,8 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { Models } from 'appwrite';
-import type { UserPrefs, AppwriteProject, ModelMessage } from '../types';
+import type { UserPrefs, AppwriteProject, ModelMessage, StudioTab } from '../types';
+import { getSdkFunctions } from '../services/appwrite';
 
 // Custom Hooks
 import { useProjects } from '../hooks/useProjects';
@@ -15,11 +17,14 @@ import { LeftSidebar } from './LeftSidebar';
 import { LogSidebar } from './LogSidebar';
 import { CodeViewerSidebar } from './CodeViewerSidebar';
 import { ConfirmationModal } from './ConfirmationModal';
+import { CreateFunctionModal } from './CreateFunctionModal';
 import { Header } from './Header';
 import { ContextBar } from './ContextBar';
 import { MainContent } from './MainContent';
 import { Footer } from './Footer';
 import { DragAndDropOverlay } from './DragAndDropOverlay';
+import { Studio } from './Studio';
+import { StudioIcon } from './Icons';
 
 interface AgentAppProps {
     currentUser: Models.User<UserPrefs>;
@@ -27,13 +32,27 @@ interface AgentAppProps {
     refreshUser: () => Promise<void>;
 }
 
-const MIN_SIDEBAR_WIDTH = 288; // w-72
-const MAX_SIDEBAR_WIDTH = 640; // w-160
+const MIN_SIDEBAR_WIDTH = 280;
+const MAX_SIDEBAR_WIDTH = 500;
+const VIEW_MODE_STORAGE_KEY = 'dv_appwrite_view_mode';
 
 export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refreshUser }) => {
     const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
     const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(false);
+    const [isCreateFunctionModalOpen, setIsCreateFunctionModalOpen] = useState(false);
     const [sessionLogs, setSessionLogs] = useState<string[]>([]);
+    
+    const [viewMode, setViewModeState] = useState<'agent' | 'studio'>(() => {
+        const saved = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+        return (saved === 'agent' || saved === 'studio') ? saved : 'agent';
+    });
+    
+    const [activeStudioTab, setActiveStudioTab] = useState<StudioTab>('overview');
+
+    const setViewMode = (mode: 'agent' | 'studio') => {
+        setViewModeState(mode);
+        localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
+    };
     
     const [confirmationState, setConfirmationState] = useState<{
         isOpen: boolean; title: string; message: string; confirmText: string; confirmButtonClass: string; onConfirm: () => void;
@@ -107,9 +126,9 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
     } = useAppContext(activeProject, logCallback);
 
     const {
-        isCodeModeActive, isFunctionContextLoading, functionFiles, editedFunctionFiles,
+        isFunctionContextLoading, functionFiles, editedFunctionFiles,
         isCodeViewerSidebarOpen, isDeploying, setIsCodeViewerSidebarOpen,
-        handleToggleCodeMode, handleCodeGenerated, handleFileContentChange,
+        handleCodeGenerated, handleFileContentChange,
         handleFileAdd, handleFileDelete, handleFileRename, handleDeployChanges,
         error: codeModeError, setError: setCodeModeError,
         codeModeEvent, clearCodeModeEvent,
@@ -120,8 +139,8 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
         selectedFiles, handleSendMessage, handleClearChat, handleFileSelect
     } = useChatSession({
         activeProject, selectedDatabase, selectedCollection, selectedBucket, selectedFunction,
-        isCodeModeActive, activeTools, geminiModel, geminiThinkingEnabled, geminiApiKey, logCallback,
-        onCodeGenerated: isCodeModeActive ? handleCodeGenerated : undefined,
+        activeTools, geminiModel, geminiThinkingEnabled, geminiApiKey, logCallback,
+        onCodeGenerated: handleCodeGenerated,
     });
     
     useEffect(() => {
@@ -151,24 +170,6 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
         });
     }, [handleDeleteProject]);
     
-    const requestModeChange = useCallback(() => {
-        const changingTo = !isCodeModeActive;
-        if (messages.length > 0) {
-            setConfirmationState({
-                isOpen: true, title: `Switch to ${changingTo ? "'Code Mode'" : "'Agent Mode'"}?`,
-                message: 'Switching modes will start a new session and clear your current chat history.',
-                confirmText: 'Switch Mode', confirmButtonClass: 'bg-cyan-600 hover:bg-cyan-700',
-                onConfirm: () => { 
-                    setMessages([]);
-                    handleToggleCodeMode(!isCodeModeActive); 
-                    setConfirmationState(null); 
-                },
-            });
-        } else {
-            handleToggleCodeMode(!isCodeModeActive);
-        }
-    }, [isCodeModeActive, messages.length, handleToggleCodeMode, setMessages]);
-
     const requestFileDelete = useCallback((path: string, type: 'file' | 'folder') => {
         setConfirmationState({
             isOpen: true, title: `Delete ${type} "${path}"?`, message: `This action is irreversible.`,
@@ -177,13 +178,27 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
         });
     }, [handleFileDelete]);
     
+    const handleFunctionCreated = useCallback(async (functionId: string) => {
+        if (!activeProject) return;
+        await refreshContextData();
+        try {
+            const sdkFunctions = getSdkFunctions(activeProject);
+            const newFunc = await sdkFunctions.get(functionId);
+            setSelectedFunction(newFunc);
+            setIsCodeViewerSidebarOpen(true);
+            logCallback(`Function "${newFunc.name}" created and selected.`);
+        } catch (e) {
+            console.error("Could not fetch newly created function details.", e);
+        }
+    }, [activeProject, refreshContextData, setSelectedFunction, logCallback, setIsCodeViewerSidebarOpen]);
+
     const { isDragging, ...dragHandlers } = useDragAndDrop(handleFileSelect);
     
     const isChatDisabled = isLoading || !activeProject || isFunctionContextLoading || isDeploying;
     const hasUnsavedCodeChanges = functionFiles && editedFunctionFiles ? JSON.stringify(functionFiles) !== JSON.stringify(editedFunctionFiles) : false;
 
     return (
-        <div className="flex h-screen bg-gray-900 text-gray-100 font-sans">
+        <div className="flex h-screen overflow-hidden text-gray-100 font-sans p-6 gap-6">
              <LeftSidebar
                 isOpen={isLeftSidebarOpen} onClose={() => setIsLeftSidebarOpen(false)}
                 projects={projects} activeProject={activeProject} onSave={handleSaveProject}
@@ -194,40 +209,79 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
                 width={isLeftSidebarOpen ? currentSidebarWidth : 0} 
                 isResizing={isResizing} 
                 onResizeStart={handleResizeMouseDown}
+                viewMode={viewMode}
+                activeStudioTab={activeStudioTab}
+                onStudioTabChange={setActiveStudioTab}
             />
-            <div className="flex flex-1 flex-col min-w-0 relative" {...dragHandlers}>
+            
+            {/* Main Canvas */}
+            <div className="flex flex-1 flex-col min-w-0 relative h-full transition-all duration-300 rounded-2xl overflow-hidden bg-gray-950/20 backdrop-blur-sm border border-white/5 shadow-2xl" {...dragHandlers}>
+                
+                {/* Header floats above */}
                 <Header
                     isLeftSidebarOpen={isLeftSidebarOpen} setIsLeftSidebarOpen={setIsLeftSidebarOpen}
                     activeProject={activeProject} currentUser={currentUser} onLogout={onLogout}
-                    isCodeModeActive={isCodeModeActive} handleToggleCodeMode={requestModeChange}
                     messages={messages} handleClearChat={handleClearChat}
                     selectedFunction={selectedFunction} isCodeViewerSidebarOpen={isCodeViewerSidebarOpen}
                     setIsCodeViewerSidebarOpen={setIsCodeViewerSidebarOpen} setIsLogSidebarOpen={setIsLogSidebarOpen}
+                    viewMode={viewMode} setViewMode={setViewMode}
                 />
                 
-                {activeProject && (
-                    <ContextBar 
-                        databases={databases} collections={collections} buckets={buckets} functions={functions}
-                        selectedDatabase={selectedDatabase} selectedCollection={selectedCollection}
-                        selectedBucket={selectedBucket} selectedFunction={selectedFunction}
-                        onDatabaseSelect={setSelectedDatabase} onCollectionSelect={setSelectedCollection}
-                        onBucketSelect={setSelectedBucket} onFunctionSelect={setSelectedFunction}
-                        isLoading={isContextLoading} onRefresh={refreshContextData}
-                    />
+                {viewMode === 'agent' ? (
+                    <>
+                        {/* Context Bar also floats */}
+                        {activeProject && (
+                            <ContextBar 
+                                databases={databases} collections={collections} buckets={buckets} functions={functions}
+                                selectedDatabase={selectedDatabase} selectedCollection={selectedCollection}
+                                selectedBucket={selectedBucket} selectedFunction={selectedFunction}
+                                onDatabaseSelect={setSelectedDatabase} onCollectionSelect={setSelectedCollection}
+                                onBucketSelect={setSelectedBucket} onFunctionSelect={setSelectedFunction}
+                                isLoading={isContextLoading} onRefresh={refreshContextData}
+                                onAddFunction={() => setIsCreateFunctionModalOpen(true)}
+                            />
+                        )}
+                        
+                        {/* Scrollable Content Area */}
+                        <div className="flex-1 overflow-hidden relative flex flex-col pt-16">
+                            <MainContent
+                                messages={messages} activeProject={activeProject}
+                                selectedFunction={selectedFunction}
+                                isFunctionContextLoading={isFunctionContextLoading} error={error}
+                                currentUser={currentUser} isLeftSidebarOpen={isLeftSidebarOpen} setIsLeftSidebarOpen={setIsLeftSidebarOpen}
+                            />
+                            
+                            <Footer
+                                onSubmit={handleSendMessage} selectedFiles={selectedFiles}
+                                onFileSelect={handleFileSelect} isLoading={isLoading}
+                                isDisabled={isChatDisabled} activeProject={activeProject}
+                            />
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex-1 overflow-y-auto bg-gray-900/40 custom-scrollbar pt-20">
+                         {activeProject ? (
+                            <Studio 
+                                activeProject={activeProject} 
+                                databases={databases} 
+                                buckets={buckets} 
+                                functions={functions}
+                                refreshData={refreshContextData}
+                                onCreateFunction={() => setIsCreateFunctionModalOpen(true)}
+                                activeTab={activeStudioTab}
+                                onTabChange={setActiveStudioTab}
+                            />
+                        ) : (
+                             <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                                <div className="w-16 h-16 bg-gray-800/50 rounded-2xl flex items-center justify-center mb-4 text-gray-600 border border-gray-700/50">
+                                    <StudioIcon />
+                                </div>
+                                <h2 className="text-xl font-bold text-gray-300">No Project Selected</h2>
+                                <p className="text-gray-500 mt-2">Select a project from the sidebar to access the Studio controls.</p>
+                            </div>
+                        )}
+                    </div>
                 )}
-                
-                <MainContent
-                    messages={messages} activeProject={activeProject}
-                    isCodeModeActive={isCodeModeActive} selectedFunction={selectedFunction}
-                    isFunctionContextLoading={isFunctionContextLoading} error={error}
-                    currentUser={currentUser} isLeftSidebarOpen={isLeftSidebarOpen} setIsLeftSidebarOpen={setIsLeftSidebarOpen}
-                />
-                
-                <Footer
-                    onSubmit={handleSendMessage} selectedFiles={selectedFiles}
-                    onFileSelect={handleFileSelect} isLoading={isLoading}
-                    isDisabled={isChatDisabled} activeProject={activeProject}
-                />
 
                 <DragAndDropOverlay isDragging={isDragging} />
             </div>
@@ -244,6 +298,15 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
 
             {confirmationState?.isOpen && (
                 <ConfirmationModal {...confirmationState} onClose={() => setConfirmationState(null)} />
+            )}
+            
+            {activeProject && (
+                <CreateFunctionModal 
+                    isOpen={isCreateFunctionModalOpen} 
+                    onClose={() => setIsCreateFunctionModalOpen(false)} 
+                    project={activeProject}
+                    onSuccess={handleFunctionCreated}
+                />
             )}
         </div>
     );

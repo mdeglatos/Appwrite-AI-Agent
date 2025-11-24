@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
-import type { AppwriteProject, AppwriteFunction, ModelMessage } from '../types';
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type { AppwriteProject, AppwriteFunction } from '../types';
 import { downloadAndUnpackDeployment, type UnpackedFile, deployCodeFromString } from '../tools/functionsTools';
 import { getSdkFunctions, Query } from '../services/appwrite';
 
@@ -8,7 +9,6 @@ export function useCodeMode(
     selectedFunction: AppwriteFunction | null,
     logCallback: (log: string) => void
 ) {
-    const [isCodeModeActive, setIsCodeModeActive] = useState(false);
     const [isFunctionContextLoading, setIsFunctionContextLoading] = useState(false);
     const [functionFiles, setFunctionFiles] = useState<UnpackedFile[] | null>(null);
     const [editedFunctionFiles, setEditedFunctionFiles] = useState<UnpackedFile[] | null>(null);
@@ -17,24 +17,36 @@ export function useCodeMode(
     const [error, setError] = useState<string | null>(null);
     const [codeModeEvent, setCodeModeEvent] = useState<{ message: string } | null>(null);
 
-    const clearCodeModeEvent = useCallback(() => setCodeModeEvent(null), []);
+    const clearCodeModeEvent = useCallback(() => {
+        setCodeModeEvent(null);
+    }, []);
     
-    const prevSelectedFunctionId = useRef<string | null | undefined>();
-    const isModeSwitching = useRef(false);
+    const prevSelectedFunctionId = useRef<string | null | undefined>(undefined);
 
     useEffect(() => {
         const functionHasChanged = selectedFunction?.$id !== prevSelectedFunctionId.current;
 
         const loadFunctionContext = async () => {
-            if (!isCodeModeActive || !selectedFunction || !functionHasChanged || isModeSwitching.current) {
+            // If no function is selected, clear context and return
+            if (!selectedFunction) {
+                setFunctionFiles(null);
+                setEditedFunctionFiles(null);
+                setIsCodeViewerSidebarOpen(false);
+                return;
+            }
+
+            // Only reload if the function changed or we have no files yet
+            if (!functionHasChanged && functionFiles) {
                 return;
             }
 
             setIsFunctionContextLoading(true);
             setFunctionFiles(null);
             setEditedFunctionFiles(null);
-            setIsCodeViewerSidebarOpen(false);
-            logCallback(`Code Mode: Loading context for function "${selectedFunction.name}"...`);
+            // Don't force close/open sidebar here, let the caller or user decide.
+            // But if it's a new selection (functionHasChanged), we generally start closed unless triggered by creation.
+            
+            logCallback(`Context: Loading source code for function "${selectedFunction.name}"...`);
             setError(null);
             
             try {
@@ -44,8 +56,11 @@ export function useCodeMode(
                 
                 if (!deploymentId) {
                     const deploymentsList = await projectFunctions.listDeployments(selectedFunction.$id, [Query.orderDesc('$createdAt')]);
-                    const latestReadyDeployment = deploymentsList.deployments.find(d => d.status === 'ready');
-                    if (latestReadyDeployment) deploymentId = latestReadyDeployment.$id;
+                    // Change: Grab the latest deployment regardless of status (building, ready, failed).
+                    // This ensures that if we just created the function manually, we see the code immediately.
+                    if (deploymentsList.deployments.length > 0) {
+                        deploymentId = deploymentsList.deployments[0].$id;
+                    }
                 }
                 
                 const files = await downloadAndUnpackDeployment(activeProject, selectedFunction.$id, deploymentId);
@@ -53,16 +68,14 @@ export function useCodeMode(
                 if (files && files.length > 0) {
                     setFunctionFiles(files);
                     setEditedFunctionFiles(JSON.parse(JSON.stringify(files)));
-                    setIsCodeViewerSidebarOpen(true);
-                    logCallback(`Code Mode: Found ${files.length} file(s).`);
-                    const modelResponseText = `Loaded code for **${selectedFunction.name}**. Files: ${files.map(f => `\`${f.name}\``).join(', ')}. Ready for instructions.`;
+                    logCallback(`Context: Loaded ${files.length} file(s) for function execution.`);
+                    const modelResponseText = `Loaded code context for **${selectedFunction.name}**. I can now read and edit these files.`;
                     setCodeModeEvent({ message: modelResponseText });
                 } else {
                     setFunctionFiles([]);
                     setEditedFunctionFiles([]);
-                    setIsCodeViewerSidebarOpen(true);
-                    logCallback(`Code Mode: Function "${selectedFunction.name}" has no deployment. Ready to create files.`);
-                    const modelResponseText = `Function **${selectedFunction.name}** has no code. I'm ready to help you write it from scratch.`;
+                    logCallback(`Context: Function "${selectedFunction.name}" has no deployment. Ready to create files.`);
+                    const modelResponseText = `Function **${selectedFunction.name}** has no existing code. I'm ready to help you write it from scratch.`;
                     setCodeModeEvent({ message: modelResponseText });
                 }
             } catch (e) {
@@ -77,33 +90,15 @@ export function useCodeMode(
         loadFunctionContext();
         prevSelectedFunctionId.current = selectedFunction?.$id;
 
-    }, [isCodeModeActive, selectedFunction, activeProject, logCallback, setError]);
-    
-    useEffect(() => {
-        if (!isCodeModeActive) {
-            setFunctionFiles(null);
-            setEditedFunctionFiles(null);
-            setIsCodeViewerSidebarOpen(false);
-        } else if (!selectedFunction) {
-            setFunctionFiles(null);
-            setEditedFunctionFiles(null);
-            setIsCodeViewerSidebarOpen(false);
-        }
-        isModeSwitching.current = false;
-    }, [isCodeModeActive, selectedFunction]);
+    }, [selectedFunction, activeProject, logCallback, setError]);
 
-
-    const handleToggleCodeMode = (isChanging: boolean) => {
-        isModeSwitching.current = true;
-        setIsCodeModeActive(isChanging);
-        logCallback(`Switched to ${isChanging ? 'Code Mode' : 'Agent Mode'}. Session will reset.`);
-    };
 
     const handleCodeGenerated = useCallback((newFiles: { name: string; content: string }[]) => {
-        logCallback("Code Mode: AI has generated new code. The editor panel has been updated.");
+        logCallback("Smart Mode: AI has generated new code. The editor panel has been updated.");
         const unpackedNewFiles: UnpackedFile[] = newFiles.map(file => ({ name: file.name, content: file.content, size: new Blob([file.content]).size }));
         setEditedFunctionFiles(unpackedNewFiles);
         setFunctionFiles(unpackedNewFiles);
+        setIsCodeViewerSidebarOpen(true); // Open sidebar when code is generated
     }, [logCallback]);
 
     const handleFileContentChange = (fileName: string, newContent: string) => {
@@ -223,14 +218,12 @@ export function useCodeMode(
     };
     
     return {
-        isCodeModeActive,
         isFunctionContextLoading,
         functionFiles,
         editedFunctionFiles,
         isCodeViewerSidebarOpen,
         isDeploying,
         setIsCodeViewerSidebarOpen,
-        handleToggleCodeMode,
         handleCodeGenerated,
         handleFileContentChange,
         handleFileAdd,

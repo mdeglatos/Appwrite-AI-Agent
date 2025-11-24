@@ -41,17 +41,17 @@ export const LogSidebar: React.FC<LogSidebarProps> = ({ isOpen, onClose, logs, o
       />
       <aside
         className={`
-          fixed inset-y-0 right-0 z-40
-          bg-gray-800/90 backdrop-blur-sm text-gray-300 flex flex-col border-l border-gray-700
+          fixed top-6 bottom-6 right-6 z-40
+          bg-gray-800/90 backdrop-blur-sm text-gray-300 flex flex-col border border-gray-700
           transition-transform duration-300 ease-in-out
-          w-full max-w-lg sm:w-96
-          transform ${isOpen ? 'translate-x-0' : 'translate-x-full'}
+          w-full max-w-lg sm:w-96 rounded-2xl
+          transform ${isOpen ? 'translate-x-0' : 'translate-x-[calc(100%+2rem)]'}
         `}
         aria-labelledby="log-sidebar-title"
         role="log"
       >
         <div className="flex flex-col h-full">
-          <header className="p-4 border-b border-gray-700 shadow-md bg-gray-900/50 flex justify-between items-center flex-shrink-0">
+          <header className="p-4 border-b border-gray-700 shadow-md bg-gray-900/50 flex justify-between items-center flex-shrink-0 rounded-t-2xl">
             <div className="flex items-center gap-3">
               <TerminalIcon />
               <h2 id="log-sidebar-title" className="text-lg font-bold text-cyan-300">

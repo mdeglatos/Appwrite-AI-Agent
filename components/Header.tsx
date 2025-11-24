@@ -2,7 +2,8 @@
 import React from 'react';
 import type { Models } from 'appwrite';
 import type { UserPrefs, AppwriteProject, Message, AppwriteFunction } from '../types';
-import { MenuIcon, DeleteIcon, CodeIcon, TerminalIcon, UserIcon, LogoutIcon } from './Icons';
+import { MenuIcon, DeleteIcon, CodeIcon, TerminalIcon, UserIcon, LogoutIcon, StudioIcon } from './Icons';
+import { RiRobot2Line } from 'react-icons/ri';
 
 interface HeaderProps {
     isLeftSidebarOpen: boolean;
@@ -10,106 +11,130 @@ interface HeaderProps {
     activeProject: AppwriteProject | null;
     currentUser: Models.User<UserPrefs>;
     onLogout: () => void;
-    isCodeModeActive: boolean;
-    handleToggleCodeMode: () => void;
     messages: Message[];
     handleClearChat: () => void;
     selectedFunction: AppwriteFunction | null;
     isCodeViewerSidebarOpen: boolean;
     setIsCodeViewerSidebarOpen: (isOpen: boolean) => void;
     setIsLogSidebarOpen: (isOpen: boolean) => void;
+    viewMode: 'agent' | 'studio';
+    setViewMode: (mode: 'agent' | 'studio') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
     isLeftSidebarOpen, setIsLeftSidebarOpen,
     activeProject, currentUser, onLogout,
-    isCodeModeActive, handleToggleCodeMode,
     messages, handleClearChat,
     selectedFunction, setIsCodeViewerSidebarOpen,
-    setIsLogSidebarOpen
+    setIsLogSidebarOpen,
+    viewMode, setViewMode
 }) => {
     return (
-        <header className="h-16 px-4 sm:px-6 border-b border-white/5 bg-gray-900/60 backdrop-blur-md flex justify-between items-center flex-shrink-0 z-20 relative">
-            <div className="flex items-center gap-3 sm:gap-5">
-                <button 
-                    onClick={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)} 
-                    className={`p-2 rounded-lg transition-colors ${isLeftSidebarOpen ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-                    aria-label="Toggle sidebar"
-                >
-                    <MenuIcon />
-                </button>
-                <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-                        <h1 className="text-lg font-bold tracking-tight text-gray-100">DV Appwrite Studio</h1>
-                    </div>
-                    <p className="text-xs text-gray-400 flex items-center gap-1">
-                        Project: 
-                        <span className={`font-medium truncate max-w-[120px] sm:max-w-xs ${activeProject ? 'text-cyan-300' : 'text-gray-500'}`}>
-                            {activeProject?.name || 'No Project Selected'}
-                        </span>
-                    </p>
-                </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-                {/* Mode Switcher */}
-                <div className="hidden md:flex items-center bg-gray-800/50 p-1 rounded-full border border-white/5">
-                    <button
-                        onClick={isCodeModeActive ? handleToggleCodeMode : undefined}
-                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 ${!isCodeModeActive ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/50' : 'text-gray-400 hover:text-gray-200'}`}
-                    >
-                        Agent
-                    </button>
-                    <button
-                        onClick={!isCodeModeActive ? handleToggleCodeMode : undefined}
-                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 ${isCodeModeActive ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50' : 'text-gray-400 hover:text-gray-200'}`}
-                    >
-                        Code
-                    </button>
-                </div>
-
-                <div className="h-6 w-px bg-gray-700/50 mx-1 hidden sm:block"></div>
-
-                <div className="flex items-center gap-2">
+        <header className="absolute top-4 left-0 right-0 z-20 flex justify-center pointer-events-none px-4">
+            <div className="bg-gray-900/70 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl p-2 flex items-center gap-4 pointer-events-auto max-w-5xl w-full justify-between">
+                
+                {/* Left Section: Branding & Sidebar Toggle */}
+                <div className="flex items-center gap-3">
                     <button 
-                        onClick={handleClearChat} 
-                        disabled={messages.length === 0} 
-                        className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-30" 
-                        title="Clear Chat"
+                        onClick={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)} 
+                        className={`p-2 rounded-xl transition-all duration-200 border border-transparent ${isLeftSidebarOpen ? 'bg-gray-800 text-white shadow-sm border-white/5' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                        aria-label="Toggle sidebar"
                     >
-                        <DeleteIcon />
+                        <MenuIcon />
                     </button>
-                    <button 
-                        onClick={() => setIsCodeViewerSidebarOpen(true)} 
-                        disabled={!isCodeModeActive || !selectedFunction} 
-                        className="p-2 text-gray-400 hover:text-purple-400 hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-30"
-                        title="View Code"
-                    >
-                        <CodeIcon />
-                    </button>
-                    <button 
-                        onClick={() => setIsLogSidebarOpen(true)} 
-                        className="p-2 text-gray-400 hover:text-cyan-400 hover:bg-gray-800 rounded-lg transition-colors"
-                        title="View Logs"
-                    >
-                        <TerminalIcon />
-                    </button>
-                </div>
-
-                <div className="h-6 w-px bg-gray-700/50 mx-1 hidden sm:block"></div>
-
-                <div className="group relative">
-                    <div className="flex items-center gap-2 p-1 pl-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-full border border-white/5 transition-colors cursor-default">
-                        <span className="text-xs font-medium text-gray-300 hidden sm:block max-w-[80px] truncate">{currentUser.name}</span>
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-gray-700 to-gray-600 flex items-center justify-center text-gray-300 border border-gray-600">
-                            <UserIcon />
+                    
+                    <div className="flex items-center gap-2 select-none">
+                        <div className="relative group">
+                            <div className="absolute -inset-2 bg-gradient-to-r from-cyan-500 to-purple-600 rounded-full blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+                            <div className="relative bg-gray-950 rounded-full p-1.5 text-cyan-400 border border-gray-800">
+                                 <RiRobot2Line size={18} />
+                            </div>
                         </div>
+                        <span className="hidden sm:block font-bold text-sm tracking-tight text-gray-200">
+                            DV <span className="text-gray-500 font-normal">Studio</span>
+                        </span>
+                        
+                        {activeProject && (
+                            <div className="flex items-center gap-2 ml-1 animate-fade-in border-l border-gray-700/50 pl-3">
+                                <span className="text-sm font-medium text-cyan-100 truncate max-w-[150px] sm:max-w-[200px]" title={activeProject.name}>
+                                    {activeProject.name}
+                                </span>
+                            </div>
+                        )}
                     </div>
-                    <div className="absolute right-0 top-full mt-2 w-32 py-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right z-50">
-                        <button onClick={onLogout} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700/50 flex items-center gap-2">
-                            <LogoutIcon /> Logout
+                </div>
+
+                {/* Center Section: View Mode Switcher */}
+                <div className="flex p-1 bg-gray-950/50 border border-gray-800 rounded-xl">
+                    <button
+                        onClick={() => setViewMode('agent')}
+                        className={`
+                            relative flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-300
+                            ${viewMode === 'agent' 
+                                ? 'bg-cyan-600/90 text-white shadow-lg shadow-cyan-900/20' 
+                                : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}
+                        `}
+                    >
+                        <RiRobot2Line size={14} /> 
+                        <span className="hidden sm:inline">Agent</span>
+                    </button>
+                    <button
+                        onClick={() => setViewMode('studio')}
+                        className={`
+                            relative flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-300
+                            ${viewMode === 'studio' 
+                                ? 'bg-purple-600/90 text-white shadow-lg shadow-purple-900/20' 
+                                : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}
+                        `}
+                    >
+                        <StudioIcon /> 
+                        <span className="hidden sm:inline">Studio</span>
+                    </button>
+                </div>
+
+                {/* Right Section: Actions */}
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 bg-gray-950/50 p-1 rounded-xl border border-gray-800">
+                        {viewMode === 'agent' && (
+                            <button 
+                                onClick={handleClearChat} 
+                                disabled={messages.length === 0} 
+                                className="p-2 text-gray-400 hover:text-red-400 hover:bg-white/5 rounded-lg transition-colors disabled:opacity-30 disabled:hover:bg-transparent" 
+                                title="Clear Chat"
+                            >
+                                <DeleteIcon />
+                            </button>
+                        )}
+                        <button 
+                            onClick={() => setIsCodeViewerSidebarOpen(true)} 
+                            disabled={!selectedFunction} 
+                            className={`p-2 rounded-lg transition-colors ${selectedFunction ? 'text-purple-400 hover:bg-purple-500/10' : 'text-gray-600 cursor-not-allowed'}`}
+                            title={selectedFunction ? "View Function Code" : "Select a function to view code"}
+                        >
+                            <CodeIcon />
                         </button>
+                        <button 
+                            onClick={() => setIsLogSidebarOpen(true)} 
+                            className="p-2 text-gray-400 hover:text-cyan-400 hover:bg-white/5 rounded-lg transition-colors"
+                            title="View Logs"
+                        >
+                            <TerminalIcon />
+                        </button>
+                    </div>
+
+                    <div className="group relative z-50">
+                        <button className="w-9 h-9 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 flex items-center justify-center text-gray-300 hover:border-cyan-500/50 hover:text-white transition-all shadow-md">
+                            <UserIcon />
+                        </button>
+                        <div className="absolute right-0 top-full mt-3 w-56 py-1 bg-gray-900/95 backdrop-blur-xl border border-gray-700 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right scale-95 group-hover:scale-100">
+                            <div className="px-4 py-3 border-b border-gray-800">
+                                 <p className="text-sm text-white font-medium truncate">{currentUser.name}</p>
+                                 <p className="text-xs text-gray-500 truncate">{currentUser.email}</p>
+                            </div>
+                            <button onClick={onLogout} className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-gray-800 transition-colors flex items-center gap-2">
+                                <LogoutIcon /> Sign out
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

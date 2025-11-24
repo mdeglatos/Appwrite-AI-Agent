@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { UnpackedFile } from '../tools/functionsTools';
 import { CloseIcon, CopyIcon, FileIcon, CheckIcon, CodeIcon, LoadingSpinnerIcon, FolderIcon, FileAddIcon, FolderAddIcon, EditIcon, DeleteIcon, ChevronDownIcon, ChevronUpIcon } from './Icons';
@@ -213,7 +214,7 @@ export const CodeViewerSidebar: React.FC<CodeViewerSidebarProps> = ({
     return (
         <>
             <div className={`fixed inset-0 bg-black/60 z-30 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} />
-            <aside className={`fixed inset-y-0 right-0 z-40 bg-gray-900 shadow-2xl flex flex-col border-l border-gray-800 w-full max-w-5xl transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+            <aside className={`fixed top-6 bottom-6 right-6 z-40 bg-gray-900/95 backdrop-blur-xl shadow-2xl flex flex-col border border-gray-800 w-full max-w-5xl transform transition-transform duration-300 ease-in-out rounded-2xl overflow-hidden ${isOpen ? 'translate-x-0' : 'translate-x-[calc(100%+2rem)]'}`}>
                 
                 {/* Toolbar */}
                 <div className="h-14 px-4 bg-gray-900 border-b border-gray-800 flex justify-between items-center flex-shrink-0">
