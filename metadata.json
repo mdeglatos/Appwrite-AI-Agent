@@ -1,6 +1,6 @@
 {
-  "name": "DV Appwrite Studio",
-  "description": "DV Appwrite Studio is an AI-powered development environment that runs entirely in the browser, using Gemini to interpret user commands and the Appwrite Web SDK to interact with an Appwrite backend.",
+  "name": "DV Backend Studio",
+  "description": "DV Backend Studio is an AI-powered development environment that runs entirely in the browser, using Gemini to interpret user commands and the Appwrite Web SDK to interact with an Appwrite backend.",
   "requestFramePermissions": [],
   "prompt": ""
 }

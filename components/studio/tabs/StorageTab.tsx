@@ -23,7 +23,7 @@ export const StorageTab: React.FC<StorageTabProps> = ({
 }) => {
     if (!selectedBucket) {
         return (
-            <ResourceTable 
+            <ResourceTable<Bucket> 
                 title="Storage Buckets" 
                 data={buckets} 
                 onCreate={onCreateBucket} 
@@ -37,7 +37,7 @@ export const StorageTab: React.FC<StorageTabProps> = ({
     return (
         <>
             <Breadcrumb items={[{ label: 'Storage', onClick: () => onSelectBucket(null) }, { label: selectedBucket.name }]} />
-            <ResourceTable 
+            <ResourceTable<Models.File> 
                 title={`Files in ${selectedBucket.name}`} 
                 data={files} 
                 onDelete={onDeleteFile} 

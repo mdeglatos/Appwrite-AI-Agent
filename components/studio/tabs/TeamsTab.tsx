@@ -22,7 +22,7 @@ export const TeamsTab: React.FC<TeamsTabProps> = ({
 }) => {
     if (!selectedTeam) {
         return (
-            <ResourceTable 
+            <ResourceTable<Models.Team<any>> 
                 title="Teams" 
                 data={teams} 
                 onCreate={onCreateTeam} 
@@ -36,7 +36,7 @@ export const TeamsTab: React.FC<TeamsTabProps> = ({
     return (
         <>
             <Breadcrumb items={[{ label: 'Teams', onClick: () => onSelectTeam(null) }, { label: selectedTeam.name }]} />
-            <ResourceTable 
+            <ResourceTable<Models.Membership> 
                 title="Memberships" 
                 data={memberships} 
                 onCreate={onCreateMembership} 

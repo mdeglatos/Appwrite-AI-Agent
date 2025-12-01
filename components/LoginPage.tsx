@@ -66,7 +66,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 </span>
             </div>
           </div>
-          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">DV Appwrite Studio</h1>
+          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">DV Backend Studio</h1>
           <h2 className="text-lg font-medium text-gray-300">{isLoginView ? 'Welcome Back' : 'Create Account'}</h2>
         </div>
 

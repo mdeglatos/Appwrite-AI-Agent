@@ -59,7 +59,7 @@ export const DatabasesTab: React.FC<DatabasesTabProps> = ({
 
     if (!selectedDb) {
         return (
-            <ResourceTable 
+            <ResourceTable<Database> 
                 title="Databases" 
                 data={databases} 
                 onCreate={onCreateDatabase} 
@@ -74,7 +74,7 @@ export const DatabasesTab: React.FC<DatabasesTabProps> = ({
         return (
             <>
                 <Breadcrumb items={[{ label: 'Databases', onClick: () => onSelectDb(null) }, { label: selectedDb.name }]} />
-                <ResourceTable 
+                <ResourceTable<Models.Collection> 
                     title={`Collections in ${selectedDb.name}`} 
                     data={collections} 
                     onCreate={onCreateCollection} 
@@ -122,7 +122,7 @@ export const DatabasesTab: React.FC<DatabasesTabProps> = ({
 
             <div className="flex-1">
                 {collectionTab === 'documents' && (
-                    <ResourceTable 
+                    <ResourceTable<Models.Document> 
                         data={documents} 
                         onCreate={onCreateDocument} 
                         onDelete={onDeleteDocument} 
@@ -134,7 +134,7 @@ export const DatabasesTab: React.FC<DatabasesTabProps> = ({
                 )}
 
                 {collectionTab === 'attributes' && (
-                    <ResourceTable 
+                    <ResourceTable<any> 
                         data={attributes} 
                         onDelete={(item) => onDeleteAttribute(item)} 
                         createLabel="Add Attribute"
@@ -174,7 +174,7 @@ export const DatabasesTab: React.FC<DatabasesTabProps> = ({
                 )}
 
                 {collectionTab === 'indexes' && (
-                        <ResourceTable 
+                        <ResourceTable<any> 
                         data={indexes} 
                         onDelete={(item) => onDeleteIndex(item)} 
                         onCreate={onCreateIndex} 

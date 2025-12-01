@@ -11,7 +11,7 @@ interface UsersTabProps {
 
 export const UsersTab: React.FC<UsersTabProps> = ({ users, onCreateUser, onDeleteUser }) => {
     return (
-        <ResourceTable 
+        <ResourceTable<Models.User<any>> 
             title="Users" 
             data={users} 
             onCreate={onCreateUser} 

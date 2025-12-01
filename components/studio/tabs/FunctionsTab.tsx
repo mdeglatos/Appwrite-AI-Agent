@@ -45,7 +45,7 @@ export const FunctionsTab: React.FC<FunctionsTabProps> = ({
 
     if (!selectedFunction) {
         return (
-            <ResourceTable 
+            <ResourceTable<AppwriteFunction> 
                 title="Functions" 
                 data={functions} 
                 onCreate={onCreateFunction} 
@@ -100,7 +100,7 @@ export const FunctionsTab: React.FC<FunctionsTabProps> = ({
             </div>
 
             <div className="space-y-8">
-                <ResourceTable 
+                <ResourceTable<Models.Deployment> 
                     title="Deployments" 
                     data={deployments} 
                     selection={{
@@ -133,7 +133,7 @@ export const FunctionsTab: React.FC<FunctionsTabProps> = ({
                     )}
                 />
                 
-                <ResourceTable 
+                <ResourceTable<Models.Execution> 
                     title="Executions (Logs)" 
                     data={executions} 
                     autoHeight

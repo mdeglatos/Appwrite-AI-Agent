@@ -109,7 +109,7 @@ export const CreateFunctionModal: React.FC<CreateFunctionModalProps> = ({ isOpen
             const packageJson = {
                 name: name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
                 version: "1.0.0",
-                description: "Created with DV Appwrite Studio",
+                description: "Created with DV Backend Studio",
                 main: template === 'simple' ? "index.js" : "src/main.js",
                 type: "module",
                 dependencies: {
