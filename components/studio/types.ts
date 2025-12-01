@@ -1,4 +1,5 @@
 
+import React from 'react';
 
 export type ModalType = 'confirm' | 'form' | 'custom';
 

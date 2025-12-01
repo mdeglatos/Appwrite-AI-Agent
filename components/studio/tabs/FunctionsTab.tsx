@@ -150,9 +150,12 @@ export const FunctionsTab: React.FC<FunctionsTabProps> = ({
                     renderName={(e) => <span className="flex items-center gap-2"><TerminalIcon size={14}/> <span className="font-mono">{e.$id}</span></span>}
                     renderExtra={(e) => (
                         <div className="flex items-center justify-between w-full">
-                            <span className={`text-[10px] ${e.status === 'completed' ? 'text-green-400' : e.status === 'failed' ? 'text-red-400' : 'text-yellow-400'}`}>
-                                {e.status} ({e.duration.toFixed(3)}s)
-                            </span>
+                            <div className="flex items-center gap-3">
+                                <span className="text-[10px] text-gray-500">{new Date(e.$createdAt).toLocaleString()}</span>
+                                <span className={`text-[10px] ${e.status === 'completed' ? 'text-green-400' : e.status === 'failed' ? 'text-red-400' : 'text-yellow-400'}`}>
+                                    {e.status} ({e.duration.toFixed(3)}s)
+                                </span>
+                            </div>
                             <button 
                                 onClick={(ev) => { ev.stopPropagation(); onViewExecution(e); }}
                                 className="ml-2 p-1 text-gray-400 hover:text-cyan-400 hover:bg-gray-800 rounded transition-colors"

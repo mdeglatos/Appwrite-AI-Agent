@@ -18,7 +18,7 @@ interface MainContentProps {
 }
 
 const EmptyState = ({ title, description, icon, action }: { title: string, description: string, icon?: React.ReactNode, action?: React.ReactNode }) => (
-    <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-fade-in mt-10">
+    <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-fade-in">
        <div className="relative group mb-8">
            <div className="absolute -inset-8 bg-gradient-to-t from-cyan-600/20 to-purple-600/20 rounded-full blur-2xl opacity-50"></div>
            <div className="relative w-24 h-24 bg-gray-900/80 backdrop-blur-xl rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl">
@@ -82,13 +82,17 @@ export const MainContent: React.FC<MainContentProps> = ({
     };
 
     return (
-        <main ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 md:p-6 pb-40 scroll-smooth pt-24 custom-scrollbar">
-            <div className="max-w-3xl mx-auto min-h-full flex flex-col space-y-8">
-                {messages.length === 0 && renderWelcomeMessage()}
-                
-                {messages.map((msg) => (
-                    <ChatMessage key={msg.id} message={msg} />
-                ))}
+        <main ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 md:p-6 scroll-smooth custom-scrollbar relative">
+            <div className="max-w-3xl mx-auto min-h-full flex flex-col space-y-6">
+                {messages.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center">
+                        {renderWelcomeMessage()}
+                    </div>
+                ) : (
+                    messages.map((msg) => (
+                        <ChatMessage key={msg.id} message={msg} />
+                    ))
+                )}
                 
                 {error && (
                     <div className="mx-auto w-full max-w-2xl mt-4 animate-fade-in">

@@ -30,8 +30,8 @@ export const Header: React.FC<HeaderProps> = ({
     viewMode, setViewMode
 }) => {
     return (
-        <header className="absolute top-4 left-0 right-0 z-20 flex justify-center pointer-events-none px-4">
-            <div className="bg-gray-900/70 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl p-2 flex items-center gap-4 pointer-events-auto max-w-5xl w-full justify-between">
+        <header className="flex-shrink-0 z-30 flex justify-center w-full px-4 pt-4 pb-2">
+            <div className="bg-gray-900/90 backdrop-blur-xl border border-white/10 shadow-lg rounded-2xl p-2 flex items-center gap-4 w-full max-w-5xl justify-between">
                 
                 {/* Left Section: Branding & Sidebar Toggle */}
                 <div className="flex items-center gap-3">

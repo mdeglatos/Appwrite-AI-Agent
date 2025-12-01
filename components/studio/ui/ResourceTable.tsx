@@ -26,7 +26,7 @@ interface ResourceTableProps<T> {
     autoHeight?: boolean;
 }
 
-export const ResourceTable = <T extends { $id: string } & Partial<{ name: string, key: string }>>({ 
+export const ResourceTable = <T extends { $id: string }>({ 
     title, 
     data, 
     onDelete, 
@@ -103,6 +103,9 @@ export const ResourceTable = <T extends { $id: string } & Partial<{ name: string
                         ) : (
                             data.map((item) => {
                                 const isActive = isRowActive ? isRowActive(item) : false;
+                                // Cast to any to access potential name/key properties safely since we removed the partial constraint
+                                const displayIdentifier = renderName ? renderName(item) : ((item as any).name || (item as any).key || 'Unknown');
+                                
                                 return (
                                     <tr 
                                         key={item.$id} 
@@ -124,7 +127,7 @@ export const ResourceTable = <T extends { $id: string } & Partial<{ name: string
                                             {isActive && <span className="ml-2 text-[10px] bg-green-500 text-black px-1.5 py-0.5 rounded font-bold">ACTIVE</span>}
                                         </td>
                                         <td className="px-6 py-3 font-medium text-gray-200">
-                                            {renderName ? renderName(item) : (item.name || item.key || 'Unknown')}
+                                            {displayIdentifier}
                                         </td>
                                         {renderExtra && <td className="px-6 py-3">{renderExtra(item)}</td>}
                                         {(onDelete || onSelect || onEdit) && (

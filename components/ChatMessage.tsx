@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import type { Message } from '../types';
 import { UserIcon, BotIcon, AttachmentIcon, SourcesIcon } from './Icons';
@@ -32,12 +33,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
 
         // Styled wrapper for code blocks
         const wrapper = document.createElement('div');
-        wrapper.className = 'code-block-wrapper relative group rounded-xl overflow-hidden my-4 border border-gray-700/50 shadow-md bg-[#0d1117]';
+        wrapper.className = 'code-block-wrapper relative group rounded-xl overflow-hidden my-3 border border-gray-700/50 shadow-md bg-[#0d1117]';
         preEl.parentNode?.insertBefore(wrapper, preEl);
         
         // Header for code block
         const header = document.createElement('div');
-        header.className = 'flex items-center justify-between px-4 py-2 bg-gray-800/50 border-b border-gray-700/50 text-xs text-gray-400 select-none backdrop-blur-sm';
+        header.className = 'flex items-center justify-between px-4 py-1.5 bg-gray-800/50 border-b border-gray-700/50 text-xs text-gray-400 select-none backdrop-blur-sm';
         const lang = codeEl.className.replace('language-', '') || 'code';
         header.textContent = lang;
         
@@ -56,20 +57,20 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         wrapper.appendChild(header);
         wrapper.appendChild(preEl);
         
-        preEl.className += " !m-0 !bg-transparent !p-4 overflow-x-auto text-sm font-mono";
+        preEl.className += " !m-0 !bg-transparent !p-3 overflow-x-auto text-xs font-mono";
       });
     }
   }, [message.content, message.role, message.id]);
 
   return (
-    <div className={`flex gap-5 animate-slide-up ${isUser ? 'flex-row-reverse' : 'flex-row'} w-full group`}>
+    <div className={`flex gap-3 sm:gap-4 animate-slide-up ${isUser ? 'flex-row-reverse' : 'flex-row'} w-full group`}>
       {/* Avatar */}
-      <div className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center shadow-lg z-10 ${
+      <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center shadow-lg z-10 mt-1 ${
           isUser 
             ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white' 
             : 'bg-gray-800/80 backdrop-blur border border-gray-700 text-cyan-400'
       }`}>
-        {isUser ? <UserIcon size={14} /> : <BotIcon size={18} />}
+        {isUser ? <UserIcon size={12} /> : <BotIcon size={16} />}
       </div>
 
       {/* Message Bubble */}
@@ -77,10 +78,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         
         {/* Attachments (User) */}
         {isUser && message.files && message.files.length > 0 && (
-            <div className="mb-2 flex flex-wrap justify-end gap-2">
+            <div className="mb-1 flex flex-wrap justify-end gap-2">
                 {message.files.map((file, index) => (
-                    <div key={index} className="px-3 py-2 bg-gray-900/60 backdrop-blur-sm border border-gray-700 rounded-lg flex items-center gap-2 text-xs text-gray-300 shadow-sm">
-                        <AttachmentIcon size={14} />
+                    <div key={index} className="px-2 py-1.5 bg-gray-900/60 backdrop-blur-sm border border-gray-700 rounded-lg flex items-center gap-2 text-[10px] text-gray-300 shadow-sm">
+                        <AttachmentIcon size={12} />
                         <span className="truncate max-w-[150px]">{file.name}</span>
                     </div>
                 ))}
@@ -88,7 +89,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         )}
 
         <div
-          className={`px-6 py-4 shadow-lg backdrop-blur-md ${
+          className={`px-5 py-3 shadow-lg backdrop-blur-md ${
             isUser
               ? 'bg-gradient-to-br from-cyan-900/40 to-blue-900/40 border border-cyan-500/20 text-gray-100 rounded-2xl rounded-tr-sm'
               : 'bg-gray-900/60 border border-white/5 text-gray-200 rounded-2xl rounded-tl-sm'
@@ -96,21 +97,21 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         >
             {message.content ? (
                 isUser ? (
-                    <p className="whitespace-pre-wrap text-[15px] leading-relaxed tracking-wide">{message.content}</p>
+                    <p className="whitespace-pre-wrap text-[14px] leading-relaxed tracking-wide">{message.content}</p>
                 ) : (
                     <div 
                         ref={contentRef}
                         className="prose prose-invert prose-sm max-w-none 
-                        prose-p:leading-relaxed prose-p:text-gray-300 prose-p:text-[15px]
+                        prose-p:leading-relaxed prose-p:text-gray-300 prose-p:text-[14px]
                         prose-a:text-cyan-400 prose-a:no-underline hover:prose-a:underline
-                        prose-headings:text-gray-100 prose-headings:font-bold
-                        prose-ul:my-2 prose-li:my-0.5
+                        prose-headings:text-gray-100 prose-headings:font-bold prose-headings:text-sm
+                        prose-ul:my-1 prose-li:my-0
                         prose-strong:text-cyan-200"
                         dangerouslySetInnerHTML={{ __html: marked.parse(message.content) as string }} 
                     />
                 )
             ) : (
-               isUser && <p className="italic text-gray-400 text-sm">Sent {message.files?.length} file(s).</p>
+               isUser && <p className="italic text-gray-400 text-xs">Sent {message.files?.length} file(s).</p>
             )}
         </div>
 
@@ -123,9 +124,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                         href={chunk.web!.uri}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-900/40 border border-gray-800/50 rounded-full text-xs text-gray-400 hover:text-cyan-400 hover:border-cyan-500/30 transition-all"
+                        className="flex items-center gap-2 px-3 py-1 bg-gray-900/40 border border-gray-800/50 rounded-full text-[10px] text-gray-400 hover:text-cyan-400 hover:border-cyan-500/30 transition-all"
                     >
-                        <SourcesIcon />
+                        <SourcesIcon size={12} />
                         <span className="truncate max-w-[200px]">{chunk.web!.title}</span>
                     </a>
                 ))}

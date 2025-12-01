@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import type { Database, Collection, Bucket, AppwriteFunction } from '../types';
 import { LoadingSpinnerIcon, RefreshIcon, ChevronDownIcon, AddIcon } from './Icons';
@@ -111,8 +112,8 @@ export const ContextBar: React.FC<ContextBarProps> = ({
 }) => {
 
     return (
-        <div className="absolute top-24 left-0 right-0 flex justify-center py-2 pointer-events-none z-10">
-            <div className="pointer-events-auto flex items-center gap-2 px-3 py-2 bg-gray-950/40 backdrop-blur-lg border border-white/10 rounded-full shadow-lg overflow-x-visible max-w-[95%]">
+        <div className="flex-shrink-0 z-20 flex justify-center py-2 w-full px-4 border-b border-white/5 bg-gray-950/10">
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-950/40 backdrop-blur-lg border border-white/10 rounded-full shadow-lg overflow-x-auto max-w-full custom-scrollbar">
                 <button
                     onClick={onRefresh}
                     disabled={isLoading}

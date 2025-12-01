@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ChatInput } from './ChatInput';
 
@@ -19,8 +20,8 @@ export const Footer: React.FC<FooterProps> = ({
     activeProject
 }) => {
     return (
-        <footer className="absolute bottom-6 left-0 right-0 px-4 pointer-events-none z-20 flex justify-center">
-            <div className="pointer-events-auto w-full max-w-3xl">
+        <footer className="flex-shrink-0 z-20 w-full px-4 py-4 flex justify-center bg-gray-950/20 backdrop-blur-sm border-t border-white/5">
+            <div className="w-full max-w-3xl">
                 <ChatInput
                     onSubmit={onSubmit}
                     selectedFiles={selectedFiles}

@@ -215,10 +215,10 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
                 onStudioTabChange={setActiveStudioTab}
             />
             
-            {/* Main Canvas */}
-            <div className="flex flex-1 flex-col min-w-0 relative h-full transition-all duration-300 rounded-2xl overflow-hidden bg-gray-950/20 backdrop-blur-sm border border-white/5 shadow-2xl" {...dragHandlers}>
+            {/* Main Canvas - Flex Column Layout */}
+            <div className="flex flex-1 flex-col min-w-0 h-full transition-all duration-300 rounded-2xl overflow-hidden bg-gray-950/20 backdrop-blur-sm border border-white/5 shadow-2xl" {...dragHandlers}>
                 
-                {/* Header floats above */}
+                {/* 1. Header (Static) */}
                 <Header
                     isLeftSidebarOpen={isLeftSidebarOpen} setIsLeftSidebarOpen={setIsLeftSidebarOpen}
                     activeProject={activeProject} currentUser={currentUser} onLogout={onLogout}
@@ -230,7 +230,7 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
                 
                 {viewMode === 'agent' ? (
                     <>
-                        {/* Context Bar also floats */}
+                        {/* 2. Context Bar (Static) */}
                         {activeProject && (
                             <ContextBar 
                                 databases={databases} collections={collections} buckets={buckets} functions={functions}
@@ -243,24 +243,26 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
                             />
                         )}
                         
-                        {/* Scrollable Content Area */}
-                        <div className="flex-1 overflow-hidden relative flex flex-col pt-16">
+                        {/* 3. Main Content (Scrollable, fills remaining space) */}
+                        <div className="flex-1 flex flex-col min-h-0 relative">
                             <MainContent
                                 messages={messages} activeProject={activeProject}
                                 selectedFunction={selectedFunction}
                                 isFunctionContextLoading={isFunctionContextLoading} error={error}
                                 currentUser={currentUser} isLeftSidebarOpen={isLeftSidebarOpen} setIsLeftSidebarOpen={setIsLeftSidebarOpen}
                             />
-                            
-                            <Footer
-                                onSubmit={handleSendMessage} selectedFiles={selectedFiles}
-                                onFileSelect={handleFileSelect} isLoading={isLoading}
-                                isDisabled={isChatDisabled} activeProject={activeProject}
-                            />
                         </div>
+
+                        {/* 4. Footer (Static) */}
+                        <Footer
+                            onSubmit={handleSendMessage} selectedFiles={selectedFiles}
+                            onFileSelect={handleFileSelect} isLoading={isLoading}
+                            isDisabled={isChatDisabled} activeProject={activeProject}
+                        />
                     </>
                 ) : (
-                    <div className="flex-1 overflow-y-auto bg-gray-900/40 custom-scrollbar pt-20">
+                    // Studio View
+                    <div className="flex-1 overflow-y-auto bg-gray-900/40 custom-scrollbar">
                          {activeProject ? (
                             <Studio 
                                 activeProject={activeProject} 
