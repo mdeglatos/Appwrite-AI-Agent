@@ -262,7 +262,7 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
                     </>
                 ) : (
                     // Studio View
-                    <div className="flex-1 overflow-y-auto bg-gray-900/40 custom-scrollbar">
+                    <div className="flex-1 flex flex-col overflow-hidden bg-gray-900/40">
                          {activeProject ? (
                             <Studio 
                                 activeProject={activeProject} 
@@ -280,7 +280,7 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
                                 }}
                             />
                         ) : (
-                             <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                             <div className="flex flex-col items-center justify-center h-full text-center p-8 overflow-y-auto">
                                 <div className="w-16 h-16 bg-gray-800/50 rounded-2xl flex items-center justify-center mb-4 text-gray-600 border border-gray-700/50">
                                     <StudioIcon />
                                 </div>

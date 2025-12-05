@@ -20,23 +20,24 @@ export const StudioNavBar: React.FC<StudioNavBarProps> = ({ activeTab, onTabChan
     ];
 
     return (
-        <div className="flex items-center justify-center gap-1 mb-6 p-1 bg-gray-900/50 rounded-xl border border-gray-800/50 w-fit mx-auto sticky top-0 z-20 backdrop-blur-md shadow-xl overflow-x-auto max-w-full">
-            {tabs.map(tab => (
-                <button
-                    key={tab.id}
-                    onClick={() => onTabChange(tab.id)}
-                    className={`
-                        flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap
-                        ${activeTab === tab.id 
-                            ? 'bg-gray-800 text-cyan-400 shadow-sm border border-gray-700/50' 
-                            : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'}
-                    `}
-                >
-                    {tab.icon}
-                    <span>{tab.label}</span>
-                </button>
-            ))}
+        <div className="flex justify-center w-full px-4">
+            <div className="flex items-center gap-1 p-1 bg-gray-900/50 rounded-xl border border-gray-800/50 overflow-x-auto max-w-full custom-scrollbar backdrop-blur-md shadow-sm">
+                {tabs.map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => onTabChange(tab.id)}
+                        className={`
+                            flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap
+                            ${activeTab === tab.id 
+                                ? 'bg-gray-800 text-cyan-400 shadow-sm border border-gray-700/50' 
+                                : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'}
+                        `}
+                    >
+                        {tab.icon}
+                        <span>{tab.label}</span>
+                    </button>
+                ))}
+            </div>
         </div>
     );
 };
-    

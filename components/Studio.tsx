@@ -729,16 +729,19 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, projects, databas
     };
 
     return (
-        <div className="flex flex-1 h-full overflow-hidden bg-gray-950">
-            {/* Content Area */}
+        <div className="flex flex-col flex-1 h-full overflow-hidden bg-gray-950/20">
+            {/* Header */}
+            <div className="flex-shrink-0 z-20 py-2 w-full border-b border-white/5 bg-gray-950/10 backdrop-blur-sm">
+                 <StudioNavBar activeTab={activeTab} onTabChange={onTabChange} />
+            </div>
+
+            {/* Scrollable Body */}
             <div className="flex-1 overflow-y-auto p-6 md:p-10 relative custom-scrollbar">
                  {isLoading && (
                     <div className="absolute top-4 right-4 z-10">
                         <LoadingSpinnerIcon className="text-cyan-500" />
                     </div>
                  )}
-
-                 <StudioNavBar activeTab={activeTab} onTabChange={onTabChange} />
                 
                 <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-10">
 

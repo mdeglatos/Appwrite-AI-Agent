@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { Database, Collection, Bucket, AppwriteFunction } from '../types';
 import { LoadingSpinnerIcon, RefreshIcon, ChevronDownIcon, AddIcon } from './Icons';
 
@@ -33,22 +34,59 @@ interface CustomDropdownProps {
 const CustomDropdown: React.FC<CustomDropdownProps> = ({ value, onSelect, options, placeholder, disabled }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const [coords, setCoords] = useState<{top: number, left: number, width: number, maxHeight: number} | null>(null);
     const selectedItem = options.find(o => o.$id === value);
 
+    const toggleOpen = () => {
+        if (disabled) return;
+        if (!isOpen && containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            
+            // Calculate available height below the element with a 16px buffer
+            const spaceBelow = window.innerHeight - rect.bottom - 16;
+            
+            // We use fixed positioning via portal to escape parent overflow:hidden
+            setCoords({
+                top: rect.bottom + 6,
+                left: rect.left,
+                width: Math.max(rect.width, 256), // Minimum width 256px or button width
+                maxHeight: Math.max(spaceBelow, 100) // Ensure at least 100px or available space
+            });
+            setIsOpen(true);
+        } else {
+            setIsOpen(false);
+        }
+    };
+
+    // Close on scroll (external only) or resize to avoid detached floating menus
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
+        if (!isOpen) return;
+        
+        const handleScroll = (e: Event) => {
+            // If scrolling happens inside the dropdown, do NOT close
+            if (dropdownRef.current && dropdownRef.current.contains(e.target as Node)) {
+                return;
             }
+            setIsOpen(false);
         };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+        
+        const handleResize = () => setIsOpen(false);
+        
+        // Capture phase is needed to detect scroll on parent containers
+        window.addEventListener('scroll', handleScroll, true);
+        window.addEventListener('resize', handleResize);
+        
+        return () => {
+            window.removeEventListener('scroll', handleScroll, true);
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [isOpen]);
 
     return (
         <div className="relative" ref={containerRef}>
             <button
-                onClick={() => !disabled && setIsOpen(!isOpen)}
+                onClick={toggleOpen}
                 className={`
                     flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-200 min-w-[140px] justify-between
                     ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
@@ -64,30 +102,50 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({ value, onSelect, option
                 <ChevronDownIcon size={12} className={value ? 'text-cyan-500' : 'text-gray-600'} />
             </button>
 
-            {isOpen && (
-                <div className="absolute top-full mt-2 left-0 w-64 max-h-60 overflow-y-auto bg-gray-900/95 backdrop-blur-xl border border-gray-700 rounded-xl shadow-2xl z-50 custom-scrollbar p-1">
-                    {options.length > 0 ? (
-                        <>
-                            <button
-                                onClick={() => { onSelect(''); setIsOpen(false); }}
-                                className="w-full text-left px-3 py-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/5 rounded-lg transition-colors italic"
-                            >
-                                None
-                            </button>
-                            {options.map(opt => (
+            {isOpen && coords && createPortal(
+                <>
+                    {/* Transparent Backdrop to handle click outside */}
+                    <div 
+                        className="fixed inset-0 z-[9998]" 
+                        onClick={() => setIsOpen(false)} 
+                        aria-hidden="true" 
+                    />
+                    
+                    {/* Dropdown Menu */}
+                    <div 
+                        ref={dropdownRef}
+                        className="fixed z-[9999] overflow-y-auto bg-gray-900/95 backdrop-blur-xl border border-gray-700 rounded-xl shadow-2xl custom-scrollbar p-1 animate-fade-in"
+                        style={{
+                            top: `${coords.top}px`,
+                            left: `${Math.min(coords.left, window.innerWidth - 265)}px`, // prevent overflow right
+                            width: `${Math.min(coords.width, 320)}px`,
+                            maxHeight: `${coords.maxHeight}px`
+                        }}
+                    >
+                        {options.length > 0 ? (
+                            <>
                                 <button
-                                    key={opt.$id}
-                                    onClick={() => { onSelect(opt.$id); setIsOpen(false); }}
-                                    className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors mb-0.5 ${value === opt.$id ? 'bg-cyan-900/30 text-cyan-300 font-medium' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
+                                    onClick={() => { onSelect(''); setIsOpen(false); }}
+                                    className="w-full text-left px-3 py-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-white/5 rounded-lg transition-colors italic"
                                 >
-                                    {opt.name}
+                                    None
                                 </button>
-                            ))}
-                        </>
-                    ) : (
-                        <div className="px-3 py-3 text-xs text-gray-500 text-center italic">No items found</div>
-                    )}
-                </div>
+                                {options.map(opt => (
+                                    <button
+                                        key={opt.$id}
+                                        onClick={() => { onSelect(opt.$id); setIsOpen(false); }}
+                                        className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors mb-0.5 ${value === opt.$id ? 'bg-cyan-900/30 text-cyan-300 font-medium' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
+                                    >
+                                        {opt.name}
+                                    </button>
+                                ))}
+                            </>
+                        ) : (
+                            <div className="px-3 py-3 text-xs text-gray-500 text-center italic">No items found</div>
+                        )}
+                    </div>
+                </>,
+                document.body
             )}
         </div>
     );
