@@ -119,4 +119,4 @@ export interface AppwriteFunction {
     commands: string;
 }
 
-export type StudioTab = 'overview' | 'database' | 'storage' | 'functions' | 'users' | 'teams';
+export type StudioTab = 'overview' | 'database' | 'storage' | 'functions' | 'users' | 'teams' | 'migrations';

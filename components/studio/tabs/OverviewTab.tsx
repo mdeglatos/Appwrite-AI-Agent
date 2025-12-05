@@ -1,6 +1,6 @@
 
 import React from 'react';
-import type { Database, Bucket, AppwriteFunction, StudioTab } from '../../types';
+import type { Database, Bucket, AppwriteFunction, StudioTab } from '../../../types';
 import type { Models } from 'node-appwrite';
 import { StatCard } from '../ui/StatCard';
 import { DatabaseIcon, StorageIcon, FunctionIcon, UserIcon, TeamIcon } from '../../Icons';
@@ -63,3 +63,4 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ databases, buckets, fu
         </>
     );
 };
+    

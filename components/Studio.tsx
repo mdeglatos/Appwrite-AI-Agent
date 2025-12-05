@@ -1,13 +1,13 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { ID, Query } from '../services/appwrite';
 import { getSdkDatabases, getSdkStorage, getSdkFunctions, getSdkUsers, getSdkTeams } from '../services/appwrite';
 import type { AppwriteProject, Database, Bucket, AppwriteFunction, StudioTab } from '../types';
 import type { Models } from 'node-appwrite';
 import { Modal } from './Modal';
-import { LoadingSpinnerIcon, ChevronDownIcon, CopyIcon, CheckIcon } from './Icons';
+import { LoadingSpinnerIcon, ChevronDownIcon } from './Icons';
 import type { ModalState, FormField } from './studio/types';
+import { CopyButton } from './studio/ui/CopyButton';
 
 // Tab Components
 import { StudioNavBar } from './studio/ui/StudioNavBar';
@@ -17,31 +17,11 @@ import { StorageTab } from './studio/tabs/StorageTab';
 import { FunctionsTab } from './studio/tabs/FunctionsTab';
 import { UsersTab } from './studio/tabs/UsersTab';
 import { TeamsTab } from './studio/tabs/TeamsTab';
-
-const CopyButton: React.FC<{ text: string }> = ({ text }) => {
-    const [copied, setCopied] = useState(false);
-    
-    const handleCopy = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        navigator.clipboard.writeText(text).then(() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        });
-    };
-
-    return (
-        <button 
-            onClick={handleCopy} 
-            className="text-[10px] text-gray-400 hover:text-white flex items-center gap-1 bg-gray-800 px-2 py-1 rounded border border-gray-700 hover:bg-gray-700 transition-colors"
-            title="Copy to clipboard"
-        >
-            {copied ? <CheckIcon size={10} /> : <CopyIcon size={10} />} {copied ? 'Copied' : 'Copy'}
-        </button>
-    );
-};
+import { MigrationsTab } from './studio/tabs/MigrationsTab';
 
 interface StudioProps {
     activeProject: AppwriteProject;
+    projects: AppwriteProject[];
     databases: Database[];
     buckets: Bucket[];
     functions: AppwriteFunction[];
@@ -52,7 +32,7 @@ interface StudioProps {
     onEditCode: (func: AppwriteFunction) => void;
 }
 
-export const Studio: React.FC<StudioProps> = ({ activeProject, databases, buckets, functions, refreshData, onCreateFunction, activeTab, onTabChange, onEditCode }) => {
+export const Studio: React.FC<StudioProps> = ({ activeProject, projects, databases, buckets, functions, refreshData, onCreateFunction, activeTab, onTabChange, onEditCode }) => {
     const [isLoading, setIsLoading] = useState(false);
     
     // -- Data States --
@@ -605,9 +585,12 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
 
                     {/* General Info */}
                     <div className="bg-gray-900/50 rounded-lg border border-gray-800 p-4 space-y-2 text-xs">
-                         <div className="flex justify-between border-b border-gray-800 pb-2">
+                         <div className="flex justify-between border-b border-gray-800 pb-2 group">
                             <span className="text-gray-500">Execution ID</span>
-                            <span className="font-mono text-gray-300 select-all">{e.$id}</span>
+                            <div className="flex items-center gap-2">
+                                <span className="font-mono text-gray-300 select-all">{e.$id}</span>
+                                <CopyButton text={e.$id} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
                         </div>
                         <div className="flex justify-between border-b border-gray-800 pb-2">
                             <span className="text-gray-500">Trigger</span>
@@ -659,7 +642,7 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
                         <div>
                             <div className="flex items-center justify-between mb-2">
                                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Logs</h4>
-                                {logs && <CopyButton text={logs} />}
+                                {logs && <CopyButton text={logs} showLabel={true} className="bg-gray-800 px-2 py-1 rounded border border-gray-700 hover:bg-gray-700" iconSize={10} />}
                             </div>
                             <div className="bg-black/30 rounded-lg border border-gray-800 p-3 overflow-x-auto max-h-48 custom-scrollbar">
                                 <pre className="text-xs font-mono text-gray-300 whitespace-pre-wrap">{logs || <span className="text-gray-600 italic">No logs available</span>}</pre>
@@ -670,7 +653,7 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
                             <div>
                                 <div className="flex items-center justify-between mb-2">
                                     <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider">Errors</h4>
-                                    <CopyButton text={errors} />
+                                    <CopyButton text={errors} showLabel={true} className="bg-gray-800 px-2 py-1 rounded border border-gray-700 hover:bg-gray-700" iconSize={10} />
                                 </div>
                                 <div className="bg-red-950/10 rounded-lg border border-red-900/30 p-3 overflow-x-auto max-h-48 custom-scrollbar">
                                     <pre className="text-xs font-mono text-red-300 whitespace-pre-wrap">{errors}</pre>
@@ -810,6 +793,10 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, databases, bucket
                             onCreateTeam={handleCreateTeam} onDeleteTeam={handleDeleteTeam} onSelectTeam={setSelectedTeam}
                             onCreateMembership={handleCreateMembership} onDeleteMembership={handleDeleteMembership}
                         />
+                    )}
+
+                    {activeTab === 'migrations' && (
+                        <MigrationsTab activeProject={activeProject} projects={projects} />
                     )}
                 </div>
             </div>

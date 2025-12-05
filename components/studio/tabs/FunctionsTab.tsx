@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import type { AppwriteFunction } from '../../types';
+import type { AppwriteFunction } from '../../../types';
 import type { Models } from 'node-appwrite';
 import { ResourceTable } from '../ui/ResourceTable';
 import { Breadcrumb } from '../ui/Breadcrumb';
 import { CodeIcon, TerminalIcon, EyeIcon, DeleteIcon } from '../../Icons';
+import { CopyButton } from '../ui/CopyButton';
 
 interface FunctionsTabProps {
     functions: AppwriteFunction[];
@@ -83,7 +84,10 @@ export const FunctionsTab: React.FC<FunctionsTabProps> = ({
                             </span>
                         </h2>
                         <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 font-mono">
-                            <span>{selectedFunction.$id}</span>
+                            <span className="flex items-center gap-2 group">
+                                {selectedFunction.$id}
+                                <CopyButton text={selectedFunction.$id} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </span>
                             <span>•</span>
                             <span>{selectedFunction.runtime}</span>
                         </div>

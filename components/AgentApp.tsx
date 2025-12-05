@@ -266,6 +266,7 @@ export const AgentApp: React.FC<AgentAppProps> = ({ currentUser, onLogout, refre
                          {activeProject ? (
                             <Studio 
                                 activeProject={activeProject} 
+                                projects={projects}
                                 databases={databases} 
                                 buckets={buckets} 
                                 functions={functions}

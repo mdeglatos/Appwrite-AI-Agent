@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { AddIcon, EditIcon, DeleteIcon } from '../../Icons';
+import { CopyButton } from './CopyButton';
 
 interface ResourceTableProps<T> {
     title?: string;
@@ -122,9 +123,12 @@ export const ResourceTable = <T extends { $id: string }>({
                                                 />
                                             </td>
                                         )}
-                                        <td className="px-6 py-3 font-mono text-xs text-gray-500 max-w-[150px] truncate" title={item.$id}>
-                                            {item.$id}
-                                            {isActive && <span className="ml-2 text-[10px] bg-green-500 text-black px-1.5 py-0.5 rounded font-bold">ACTIVE</span>}
+                                        <td className="px-6 py-3 font-mono text-xs text-gray-500 max-w-[150px] truncate group" title={item.$id}>
+                                            <div className="flex items-center">
+                                                <span className="truncate">{item.$id}</span>
+                                                <CopyButton text={item.$id} className="opacity-0 group-hover:opacity-100 ml-2 transition-opacity flex-shrink-0" />
+                                                {isActive && <span className="ml-2 text-[10px] bg-green-500 text-black px-1.5 py-0.5 rounded font-bold flex-shrink-0">ACTIVE</span>}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-3 font-medium text-gray-200">
                                             {displayIdentifier}

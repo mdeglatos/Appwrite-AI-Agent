@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Database } from '../../types';
+import type { Database } from '../../../types';
 import type { Models } from 'node-appwrite';
 import { ResourceTable } from '../ui/ResourceTable';
 import { Breadcrumb } from '../ui/Breadcrumb';
 import { CollectionSettings } from '../CollectionSettings';
 import { DatabaseIcon, FileIcon, KeyIcon, SettingsIcon, ChevronDownIcon } from '../../Icons';
+import { CopyButton } from '../ui/CopyButton';
 
 type CollectionTab = 'documents' | 'attributes' | 'indexes' | 'settings';
 
@@ -95,7 +96,10 @@ export const DatabasesTab: React.FC<DatabasesTabProps> = ({
                         <div className="p-2 bg-cyan-900/30 rounded-lg text-cyan-400"><DatabaseIcon size={24} /></div>
                         <div>
                             <h1 className="text-xl font-bold text-gray-100">{selectedCollection.name}</h1>
-                            <p className="text-xs font-mono text-gray-500">{selectedCollection.$id}</p>
+                            <div className="flex items-center gap-2 text-xs font-mono text-gray-500 group">
+                                {selectedCollection.$id}
+                                <CopyButton text={selectedCollection.$id} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
                         </div>
                         {!selectedCollection.enabled && <span className="ml-2 px-2 py-0.5 rounded text-[10px] bg-red-900/30 text-red-400 border border-red-900/50 uppercase font-bold">Disabled</span>}
                     </div>

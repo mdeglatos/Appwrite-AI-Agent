@@ -1,6 +1,6 @@
 
 import React from 'react';
-import type { Bucket } from '../../types';
+import type { Bucket } from '../../../types';
 import type { Models } from 'node-appwrite';
 import { ResourceTable } from '../ui/ResourceTable';
 import { Breadcrumb } from '../ui/Breadcrumb';
@@ -50,3 +50,4 @@ export const StorageTab: React.FC<StorageTabProps> = ({
         </>
     );
 };
+    
