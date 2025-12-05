@@ -67,9 +67,11 @@ export class MigrationService {
     private destTeams: Teams;
     private logCallback: (msg: string) => void;
     private stopped = false;
+    private migrationKey: string;
 
     constructor(source: AppwriteProject, dest: AppwriteProject, logCallback: (msg: string) => void) {
         this.logCallback = logCallback;
+        this.migrationKey = `mig_checkpoint_${source.projectId}_${dest.projectId}`;
 
         this.sourceClient = new Client()
             .setEndpoint(source.endpoint)
@@ -111,6 +113,33 @@ export class MigrationService {
     private error(msg: string, err: any) {
         const errMsg = err instanceof Error ? err.message : String(err);
         this.log(`ERROR ${msg}: ${errMsg}`);
+    }
+
+    // --- CHECKPOINT METHODS ---
+    public hasCheckpoint(): boolean {
+        return !!localStorage.getItem(this.migrationKey);
+    }
+
+    public clearCheckpoint() {
+        localStorage.removeItem(this.migrationKey);
+        // Also clear granular cursors
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith(`${this.migrationKey}_cursor_`)) {
+                localStorage.removeItem(key);
+            }
+        });
+    }
+
+    private saveCursor(resourceKey: string, cursor: string) {
+        localStorage.setItem(`${this.migrationKey}_cursor_${resourceKey}`, cursor);
+        // Mark overall checkpoint as existing
+        if (!localStorage.getItem(this.migrationKey)) {
+            localStorage.setItem(this.migrationKey, Date.now().toString());
+        }
+    }
+
+    private getCursor(resourceKey: string): string | undefined {
+        return localStorage.getItem(`${this.migrationKey}_cursor_${resourceKey}`) || undefined;
     }
 
     // --- PHASE 1: SCAN ---
@@ -224,13 +253,18 @@ export class MigrationService {
     }
 
     // --- PHASE 2: EXECUTE ---
-    async startMigration(plan: MigrationPlan) {
-        this.log('Starting execution phase...');
+    async startMigration(plan: MigrationPlan, resume: boolean = false) {
+        this.log(resume ? 'Resuming execution phase from last checkpoint...' : 'Starting execution phase...');
+        
+        if (!resume) {
+            this.clearCheckpoint();
+        }
+
         const opts = plan.options;
 
-        if (opts.migrateDatabases) await this.migrateDatabases(plan.databases, opts.migrateDocuments);
+        if (opts.migrateDatabases) await this.migrateDatabases(plan.databases, opts.migrateDocuments, resume);
         this.checkStop();
-        if (opts.migrateStorage) await this.migrateStorage(plan.buckets, opts.migrateFiles);
+        if (opts.migrateStorage) await this.migrateStorage(plan.buckets, opts.migrateFiles, resume);
         this.checkStop();
         if (opts.migrateFunctions) await this.migrateFunctions(plan.functions);
         this.checkStop();
@@ -239,10 +273,11 @@ export class MigrationService {
         if (opts.migrateTeams) await this.migrateTeams(plan.teams);
 
         this.log('Migration completed.');
+        this.clearCheckpoint();
     }
 
     // --- DATABASES ---
-    private async migrateDatabases(dbResources: MigrationResource[], migrateDocuments: boolean) {
+    private async migrateDatabases(dbResources: MigrationResource[], migrateDocuments: boolean, resume: boolean) {
         this.log('Migrating Databases...');
         for (const dbRes of dbResources) {
             this.checkStop();
@@ -258,12 +293,12 @@ export class MigrationService {
             }
 
             if (dbRes.children) {
-                await this.migrateCollections(dbRes.sourceId, dbRes.targetId, dbRes.children, migrateDocuments);
+                await this.migrateCollections(dbRes.sourceId, dbRes.targetId, dbRes.children, migrateDocuments, resume);
             }
         }
     }
 
-    private async migrateCollections(sourceDbId: string, targetDbId: string, colResources: MigrationResource[], migrateDocuments: boolean) {
+    private async migrateCollections(sourceDbId: string, targetDbId: string, colResources: MigrationResource[], migrateDocuments: boolean, resume: boolean) {
         // 1. Create Collections (Empty)
         for (const colRes of colResources) {
             this.checkStop();
@@ -306,7 +341,7 @@ export class MigrationService {
              for (const colRes of colResources) {
                  this.checkStop();
                  if (!colRes.enabled) continue;
-                 await this.migrateDocuments(sourceDbId, colRes.sourceId, targetDbId, colRes.targetId);
+                 await this.migrateDocuments(sourceDbId, colRes.sourceId, targetDbId, colRes.targetId, resume);
              }
         }
     }
@@ -399,11 +434,16 @@ export class MigrationService {
         }
     }
 
-    private async migrateDocuments(sourceDbId: string, sourceColId: string, targetDbId: string, targetColId: string) {
+    private async migrateDocuments(sourceDbId: string, sourceColId: string, targetDbId: string, targetColId: string, resume: boolean) {
         this.log(`    Migrating Documents...`);
-        let cursor = undefined;
+        const cursorKey = `doc_${sourceColId}`;
+        let cursor = resume ? this.getCursor(cursorKey) : undefined;
         let count = 0;
         
+        if (resume && cursor) {
+            this.log(`    > Resuming documents from ID: ${cursor}`);
+        }
+
         while (true) {
             this.checkStop();
             const queries = [Query.limit(100)];
@@ -427,6 +467,7 @@ export class MigrationService {
                     }
                 }
                 cursor = doc.$id;
+                this.saveCursor(cursorKey, cursor); // CHECKPOINT
             }
             if (docs.documents.length < 100) break;
         }
@@ -435,7 +476,7 @@ export class MigrationService {
 
 
     // --- STORAGE ---
-    private async migrateStorage(buckets: MigrationResource[], migrateFiles: boolean) {
+    private async migrateStorage(buckets: MigrationResource[], migrateFiles: boolean, resume: boolean) {
         this.log('Migrating Storage...');
         for (const res of buckets) {
             this.checkStop();
@@ -456,14 +497,20 @@ export class MigrationService {
             }
 
             if (migrateFiles) {
-                await this.migrateFiles(res.sourceId, res.targetId);
+                await this.migrateFiles(res.sourceId, res.targetId, resume);
             }
         }
     }
 
-    private async migrateFiles(sourceBucketId: string, targetBucketId: string) {
-        let cursor = undefined;
+    private async migrateFiles(sourceBucketId: string, targetBucketId: string, resume: boolean) {
+        const cursorKey = `file_${sourceBucketId}`;
+        let cursor = resume ? this.getCursor(cursorKey) : undefined;
         let count = 0;
+
+        if (resume && cursor) {
+            this.log(`    > Resuming files from ID: ${cursor}`);
+        }
+
         while (true) {
             this.checkStop();
             const queries = [Query.limit(50)];
@@ -507,6 +554,7 @@ export class MigrationService {
                     }
                 }
                 cursor = file.$id;
+                this.saveCursor(cursorKey, cursor); // CHECKPOINT
             }
             if (files.files.length < 50) break;
         }

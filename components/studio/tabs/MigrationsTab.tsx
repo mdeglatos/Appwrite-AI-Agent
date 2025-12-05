@@ -1,8 +1,8 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { AppwriteProject } from '../../../types';
 import { MigrationService, type MigrationOptions, type MigrationPlan, type MigrationResource } from '../../../services/migrationService';
-import { MigrationIcon, LoadingSpinnerIcon, WarningIcon, CheckIcon, ChevronDownIcon, ArrowLeftIcon, DatabaseIcon, StorageIcon, FunctionIcon, TeamIcon, UserIcon, DeleteIcon } from '../../Icons';
+import { MigrationIcon, LoadingSpinnerIcon, WarningIcon, CheckIcon, ChevronDownIcon, ArrowLeftIcon, DatabaseIcon, StorageIcon, FunctionIcon, TeamIcon, UserIcon, DeleteIcon, RefreshIcon } from '../../Icons';
 
 interface MigrationsTabProps {
     activeProject: AppwriteProject;
@@ -62,10 +62,24 @@ export const MigrationsTab: React.FC<MigrationsTabProps> = ({ activeProject, pro
     const [isLoading, setIsLoading] = useState(false);
     const [plan, setPlan] = useState<MigrationPlan | null>(null);
     const [logs, setLogs] = useState<string[]>([]);
+    const [hasCheckpoint, setHasCheckpoint] = useState(false);
     
     // Service Ref for cancellation
     const serviceRef = useRef<MigrationService | null>(null);
     
+    // Check for checkpoints whenever config changes
+    useEffect(() => {
+        if (destEndpoint && destProjectId && destApiKey) {
+            try {
+                const destProject: AppwriteProject = { $id: 'dest', name: 'Dest', projectId: destProjectId, endpoint: destEndpoint, apiKey: destApiKey };
+                const service = new MigrationService(activeProject, destProject, () => {});
+                setHasCheckpoint(service.hasCheckpoint());
+            } catch (e) { setHasCheckpoint(false); }
+        } else {
+            setHasCheckpoint(false);
+        }
+    }, [destEndpoint, destProjectId, destApiKey, activeProject]);
+
     // UI Helpers
     const handleLog = (msg: string) => {
         setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
@@ -88,7 +102,7 @@ export const MigrationsTab: React.FC<MigrationsTabProps> = ({ activeProject, pro
     };
 
     // Step 1 -> 2: Scan
-    const handleScan = async () => {
+    const handleScan = async (resume: boolean = false) => {
         if (!destEndpoint || !destProjectId || !destApiKey) {
             alert('Please provide all destination project details.');
             return;
@@ -107,6 +121,8 @@ export const MigrationsTab: React.FC<MigrationsTabProps> = ({ activeProject, pro
             const generatedPlan = await service.getMigrationPlan(options);
             setPlan(generatedPlan);
             setStep('preview');
+            // If resuming immediately (e.g. user clicked resume on step 1), we might skip preview or just show plan
+            // But usually resume implies execution. Here we scan first to show the plan, then execute with resume flag.
         } catch (e) {
             alert(`Scan Failed: ${e instanceof Error ? e.message : String(e)}`);
         } finally {
@@ -136,7 +152,7 @@ export const MigrationsTab: React.FC<MigrationsTabProps> = ({ activeProject, pro
     };
 
     // Step 2 -> 3: Execute
-    const handleExecute = async () => {
+    const handleExecute = async (resume: boolean = false) => {
         if (!plan) return;
         setStep('executing');
         setExecutionStatus('running');
@@ -155,13 +171,16 @@ export const MigrationsTab: React.FC<MigrationsTabProps> = ({ activeProject, pro
         serviceRef.current = service;
 
         try {
-            await service.startMigration(plan);
+            await service.startMigration(plan, resume);
             handleLog('✅ Migration process finished.');
             setExecutionStatus('completed');
+            setHasCheckpoint(false); // Finished, no checkpoint needed
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
             handleLog(`❌ Fatal Error: ${msg}`);
             setExecutionStatus(msg.includes('force stopped') ? 'stopped' : 'error');
+            // Checkpoint might exist
+            setHasCheckpoint(service.hasCheckpoint());
         }
     };
 
@@ -267,14 +286,29 @@ export const MigrationsTab: React.FC<MigrationsTabProps> = ({ activeProject, pro
                             </div>
                         </div>
                         
-                        <button 
-                            onClick={handleScan} 
-                            disabled={isLoading}
-                            className={`w-full py-3 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-2 transition-all ${isLoading ? 'bg-gray-700 cursor-not-allowed' : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500'}`}
-                        >
-                            {isLoading ? <LoadingSpinnerIcon /> : <MigrationIcon />} 
-                            {isLoading ? 'Scanning Project...' : 'Scan Project'}
-                        </button>
+                        <div className="space-y-3">
+                            <button 
+                                onClick={() => handleScan(false)} 
+                                disabled={isLoading}
+                                className={`w-full py-3 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-2 transition-all ${isLoading ? 'bg-gray-700 cursor-not-allowed' : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500'}`}
+                            >
+                                {isLoading ? <LoadingSpinnerIcon /> : <MigrationIcon />} 
+                                {isLoading ? 'Scanning Project...' : 'Scan Project'}
+                            </button>
+                            
+                            {hasCheckpoint && (
+                                <div className="p-3 bg-yellow-900/20 border border-yellow-700/50 rounded-xl text-center">
+                                    <p className="text-xs text-yellow-300 mb-2">Previous migration checkpoint detected.</p>
+                                    <button 
+                                        onClick={() => handleScan(true)}
+                                        disabled={isLoading}
+                                        className="w-full py-2 bg-yellow-800 hover:bg-yellow-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <RefreshIcon size={12} /> Resume from Checkpoint
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
@@ -367,12 +401,21 @@ export const MigrationsTab: React.FC<MigrationsTabProps> = ({ activeProject, pro
                         </div>
                     </div>
                     
-                    <div className="mt-4 flex justify-end">
+                    <div className="mt-4 flex justify-between items-center">
+                         {hasCheckpoint ? (
+                             <button 
+                                onClick={() => handleExecute(true)}
+                                className="px-8 py-3 bg-yellow-700 hover:bg-yellow-600 text-white font-bold rounded-xl shadow-lg flex items-center gap-2"
+                             >
+                                 <RefreshIcon /> Resume from Checkpoint
+                             </button>
+                         ) : <div></div>}
+
                          <button 
-                            onClick={handleExecute} 
+                            onClick={() => handleExecute(false)} 
                             className="px-8 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg flex items-center gap-2"
                         >
-                            <MigrationIcon /> Start Migration
+                            <MigrationIcon /> Start New Migration
                         </button>
                     </div>
                 </div>

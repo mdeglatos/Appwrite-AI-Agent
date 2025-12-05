@@ -2,6 +2,7 @@
 import { GoogleGenAI, type Chat, type GenerateContentResponse, type Part, type FunctionCall, type Content } from '@google/genai';
 import { availableTools, toolDefinitionGroups } from '../tools';
 import type { AIContext, Message, ActionMessage, ModelMessage, GroundingChunk } from '../types';
+import { logAuditAction } from './auditLogService';
 
 const getClient = (apiKey?: string | null): GoogleGenAI => {
     const keyToUse = apiKey || process.env.API_KEY;
@@ -203,12 +204,22 @@ export const runAI = async (
         // 4. Execute the tool calls
         const toolCallPromises = functionCalls.map(async (toolCall) => {
             const toolName = toolCall.name as keyof typeof availableTools;
+            const startTime = Date.now();
 
             // STRICT PERMISSION CHECK
             // Even if the model hallucinates a tool call or remembers it from a previous session,
             // we MUST block it if it's currently disabled in the UI.
             if (!activeTools[toolName]) {
                 logCallback(`BLOCKED: Model attempted to call disabled tool '${toolName}'.`);
+                // Log failed attempt
+                logAuditAction({
+                    projectId: context.project.projectId,
+                    toolName: toolName,
+                    args: JSON.stringify(toolCall.args),
+                    status: 'error',
+                    result: 'Tool blocked by user settings',
+                    duration: Date.now() - startTime
+                });
                 return {
                     functionResponse: {
                         name: toolCall.name,
@@ -229,6 +240,14 @@ export const runAI = async (
 
             if (!toolToCall) {
                 logCallback(`Error: Unknown tool referenced by the model: ${toolCall.name}`);
+                logAuditAction({
+                    projectId: context.project.projectId,
+                    toolName: toolCall.name,
+                    args: JSON.stringify(toolCall.args),
+                    status: 'error',
+                    result: 'Unknown tool',
+                    duration: Date.now() - startTime
+                });
                 return {
                     functionResponse: {
                         name: toolCall.name,
@@ -259,15 +278,48 @@ export const runAI = async (
 
             // Execute the tool
             logCallback(`Executing tool: ${toolName} with args: ${JSON.stringify(toolCall.args, null, 2)}`);
-            const toolResult = await (toolToCall as any)(context, finalArgs);
-            logCallback(`Tool execution result for ${toolName}: ${JSON.stringify(toolResult, null, 2)}`);
+            try {
+                const toolResult = await (toolToCall as any)(context, finalArgs);
+                const duration = Date.now() - startTime;
+                logCallback(`Tool execution result for ${toolName}: ${JSON.stringify(toolResult, null, 2)}`);
+                
+                // Audit Log Success
+                logAuditAction({
+                    projectId: context.project.projectId,
+                    toolName: toolName,
+                    args: JSON.stringify(toolCall.args),
+                    status: toolResult && toolResult.error ? 'error' : 'success',
+                    result: JSON.stringify(toolResult),
+                    duration: duration
+                });
 
-            return {
-                functionResponse: {
-                    name: toolCall.name,
-                    response: toolResult,
-                },
-            };
+                return {
+                    functionResponse: {
+                        name: toolCall.name,
+                        response: toolResult,
+                    },
+                };
+            } catch (err: any) {
+                const duration = Date.now() - startTime;
+                const errorMessage = err.message || String(err);
+                
+                // Audit Log Failure
+                logAuditAction({
+                    projectId: context.project.projectId,
+                    toolName: toolName,
+                    args: JSON.stringify(toolCall.args),
+                    status: 'error',
+                    result: errorMessage,
+                    duration: duration
+                });
+
+                return {
+                    functionResponse: {
+                        name: toolCall.name,
+                        response: { error: errorMessage },
+                    },
+                };
+            }
         });
 
         const toolResponses: Part[] = await Promise.all(toolCallPromises);
