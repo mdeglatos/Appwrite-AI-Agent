@@ -1,13 +1,15 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import LoginPage from './components/LoginPage';
 import { AgentApp } from './components/AgentApp';
+import { LandingPage } from './components/LandingPage';
 import { LoadingSpinnerIcon } from './components/Icons';
 import { useAuth } from './hooks/useAuth';
 
 const App: React.FC = () => {
     // isAuthLoading is now only true during the very first session check
     const { currentUser, setCurrentUser, isAuthLoading, handleLogout, refreshUser } = useAuth();
+    const [showLanding, setShowLanding] = useState(true);
 
     if (isAuthLoading) {
         return (
@@ -20,11 +22,15 @@ const App: React.FC = () => {
         );
     }
 
-    if (!currentUser) {
-        return <LoginPage onLoginSuccess={setCurrentUser} />;
+    if (currentUser) {
+        return <AgentApp currentUser={currentUser} onLogout={handleLogout} refreshUser={refreshUser} />;
     }
-    
-    return <AgentApp currentUser={currentUser} onLogout={handleLogout} refreshUser={refreshUser} />;
+
+    if (showLanding) {
+        return <LandingPage onGetStarted={() => setShowLanding(false)} />;
+    }
+
+    return <LoginPage onLoginSuccess={setCurrentUser} />;
 };
 
 export default App;
