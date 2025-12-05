@@ -117,6 +117,7 @@ export const runAI = async (
     chat: Chat,
     prompt: string,
     context: AIContext,
+    activeTools: { [key: string]: boolean },
     logCallback: (log: string) => void,
     updateChat: (message: Message) => void,
     files: File[] = [],
@@ -202,6 +203,20 @@ export const runAI = async (
         // 4. Execute the tool calls
         const toolCallPromises = functionCalls.map(async (toolCall) => {
             const toolName = toolCall.name as keyof typeof availableTools;
+
+            // STRICT PERMISSION CHECK
+            // Even if the model hallucinates a tool call or remembers it from a previous session,
+            // we MUST block it if it's currently disabled in the UI.
+            if (!activeTools[toolName]) {
+                logCallback(`BLOCKED: Model attempted to call disabled tool '${toolName}'.`);
+                return {
+                    functionResponse: {
+                        name: toolCall.name,
+                        response: { error: `Tool '${toolName}' is disabled in settings. You are not allowed to use it.` },
+                    },
+                };
+            }
+
             const toolToCall = availableTools[toolName];
 
             // If the AI is generating code, send it back to the UI to update the editor.

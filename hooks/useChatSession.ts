@@ -115,7 +115,8 @@ export function useChatSession({
                 project: activeProject, database: selectedDatabase, collection: selectedCollection,
                 bucket: selectedBucket, fn: selectedFunction,
             };
-            await runAI(chat, input, context, logCallback, updateChatCallback, userMessage.files, onCodeGenerated);
+            // activeTools passed here acts as a strict filter for execution
+            await runAI(chat, input, context, activeTools, logCallback, updateChatCallback, userMessage.files, onCodeGenerated);
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
             setError(errorMessage);
