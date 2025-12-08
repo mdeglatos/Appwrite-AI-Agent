@@ -1,4 +1,3 @@
-
 import { Client, Databases, Storage, Functions, Users, Teams, ID, Query } from 'node-appwrite';
 import type { AppwriteProject } from '../types';
 import { deployCodeFromString } from '../tools/functionsTools';
@@ -313,54 +312,85 @@ export class MigrationService {
         const func = await this.destFunctions.create(
             functionId,
             workerName,
-            'node-18.0', // Standard runtime
+            'node-18.0' as any, // Standard runtime
+            undefined, // execute
             undefined, // events
-            undefined, // schedule
-            15, // timeout (short is fine, we invoke per file)
-            true, // enabled
-            true // logging
+            '',        // schedule
+            15,        // timeout
+            true,      // enabled
+            true       // logging
         );
 
         // 2. Code Bundle
+        // Using standard node-appwrite for download, native APIs for upload
         const packageJson = JSON.stringify({
             name: "migration-worker",
-            type: "module",
             dependencies: { "node-appwrite": "^14.0.0" }
         });
 
+        // Use CommonJS require syntax with native fetch/FormData
         const indexJs = `
-        import { Client, Storage, InputFile } from 'node-appwrite';
+        const nodeAppwrite = require('node-appwrite');
+        const { Client, Storage } = nodeAppwrite;
 
-        export default async ({ req, res, log, error }) => {
+        module.exports = async ({ req, res, log, error }) => {
             try {
-                if (!req.body) throw new Error("Missing body");
-                const payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+                // Parse body safely
+                let payload = req.body;
+                if (typeof payload === 'string') {
+                    try { payload = JSON.parse(payload); } catch(e) {}
+                }
+                
+                if (!payload || !payload.sourceEndpoint) throw new Error("Invalid payload: " + JSON.stringify(payload));
+                
                 const { sourceEndpoint, sourceProject, sourceKey, destEndpoint, destProject, destKey, bucketId, fileId } = payload;
 
                 log(\`Cloud Proxy: Migrating file \${fileId} in bucket \${bucketId}\`);
 
+                // 1. SETUP SOURCE CLIENT (Download)
                 const sourceClient = new Client().setEndpoint(sourceEndpoint).setProject(sourceProject).setKey(sourceKey);
                 const sourceStorage = new Storage(sourceClient);
 
-                const destClient = new Client().setEndpoint(destEndpoint).setProject(destProject).setKey(destKey);
-                const destStorage = new Storage(destClient);
-
-                // 1. Get Metadata
+                // 2. DOWNLOAD FILE & METADATA
                 const fileMeta = await sourceStorage.getFile(bucketId, fileId);
+                const arrayBuffer = await sourceStorage.getFileDownload(bucketId, fileId);
+                
+                // 3. UPLOAD TO DESTINATION (Native Fetch + FormData)
+                // This bypasses the node-appwrite InputFile requirement which can be buggy in some function runtimes
+                
+                const blob = new Blob([arrayBuffer], { type: fileMeta.mimeType });
+                
+                const formData = new FormData();
+                formData.append('fileId', fileId);
+                formData.append('file', blob, fileMeta.name);
+                
+                // Transfer permissions if they exist
+                if (fileMeta.$permissions && Array.isArray(fileMeta.$permissions)) {
+                    fileMeta.$permissions.forEach((p, i) => {
+                        formData.append(\`permissions[\${i}]\`, p);
+                    });
+                }
 
-                // 2. Download Buffer
-                const buffer = await sourceStorage.getFileDownload(bucketId, fileId);
+                const uploadUrl = \`\${destEndpoint}/storage/buckets/\${bucketId}/files\`;
 
-                // 3. Upload to Destination
-                // InputFile.fromBuffer works in Node runtime
-                await destStorage.createFile(
-                    bucketId,
-                    fileId,
-                    InputFile.fromBuffer(Buffer.from(buffer), fileMeta.name),
-                    fileMeta.$permissions
-                );
+                const uploadRes = await fetch(uploadUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-Appwrite-Project': destProject,
+                        'X-Appwrite-Key': destKey,
+                        // Do NOT set Content-Type manually for FormData with native fetch
+                    },
+                    body: formData
+                });
 
-                return res.json({ success: true, fileId });
+                if (!uploadRes.ok) {
+                    const errText = await uploadRes.text();
+                    throw new Error(\`Destination upload failed: \${uploadRes.status} - \${errText}\`);
+                }
+
+                const result = await uploadRes.json();
+                return res.json({ success: true, fileId: result.$id });
+
             } catch (e) {
                 error(e.message);
                 return res.json({ success: false, error: e.message }, 500);
@@ -574,7 +604,7 @@ export class MigrationService {
             this.checkStop();
             if (destIndexes.indexes.some(i => i.key === idx.key)) continue;
             try {
-                await this.destDatabases.createIndex(targetDbId, targetColId, idx.key, idx.type, idx.attributes, idx.orders);
+                await this.destDatabases.createIndex(targetDbId, targetColId, idx.key, idx.type as any, idx.attributes, idx.orders);
                 this.log(`    - Created index: ${idx.key}`);
             } catch (e) {
                 this.error(`creating index ${idx.key}`, e);
