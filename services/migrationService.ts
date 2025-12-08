@@ -1,6 +1,7 @@
 
 import { Client, Databases, Storage, Functions, Users, Teams, ID, Query } from 'node-appwrite';
 import type { AppwriteProject } from '../types';
+import { deployCodeFromString } from '../tools/functionsTools';
 
 export interface MigrationResource {
     type: 'database' | 'collection' | 'bucket' | 'function' | 'team' | 'user';
@@ -29,7 +30,8 @@ export interface MigrationOptions {
     migrateUsers: boolean;
     migrateTeams: boolean;
     migrateDocuments: boolean; 
-    migrateFiles: boolean; 
+    migrateFiles: boolean;
+    useCloudProxy: boolean; // New option
 }
 
 // Helper to strictly sanitize integers for Appwrite API
@@ -68,10 +70,14 @@ export class MigrationService {
     private logCallback: (msg: string) => void;
     private stopped = false;
     private migrationKey: string;
+    private destProjectConfig: AppwriteProject;
+    private sourceProjectConfig: AppwriteProject;
 
     constructor(source: AppwriteProject, dest: AppwriteProject, logCallback: (msg: string) => void) {
         this.logCallback = logCallback;
         this.migrationKey = `mig_checkpoint_${source.projectId}_${dest.projectId}`;
+        this.destProjectConfig = dest;
+        this.sourceProjectConfig = source;
 
         this.sourceClient = new Client()
             .setEndpoint(source.endpoint)
@@ -262,18 +268,160 @@ export class MigrationService {
 
         const opts = plan.options;
 
-        if (opts.migrateDatabases) await this.migrateDatabases(plan.databases, opts.migrateDocuments, resume);
-        this.checkStop();
-        if (opts.migrateStorage) await this.migrateStorage(plan.buckets, opts.migrateFiles, resume);
-        this.checkStop();
-        if (opts.migrateFunctions) await this.migrateFunctions(plan.functions);
-        this.checkStop();
-        if (opts.migrateUsers) await this.migrateUsers(plan.users);
-        this.checkStop();
-        if (opts.migrateTeams) await this.migrateTeams(plan.teams);
+        // Cloud Proxy Setup
+        let cloudWorkerId: string | null = null;
+        if (opts.useCloudProxy && opts.migrateStorage && opts.migrateFiles) {
+            try {
+                cloudWorkerId = await this.deployCloudWorker();
+            } catch (e) {
+                this.error('deploying cloud worker. Falling back to local transfer.', e);
+                opts.useCloudProxy = false;
+            }
+        }
+
+        try {
+            if (opts.migrateDatabases) await this.migrateDatabases(plan.databases, opts.migrateDocuments, resume);
+            this.checkStop();
+            if (opts.migrateStorage) await this.migrateStorage(plan.buckets, opts.migrateFiles, resume, cloudWorkerId);
+            this.checkStop();
+            if (opts.migrateFunctions) await this.migrateFunctions(plan.functions);
+            this.checkStop();
+            if (opts.migrateUsers) await this.migrateUsers(plan.users);
+            this.checkStop();
+            if (opts.migrateTeams) await this.migrateTeams(plan.teams);
+        } finally {
+            // Cleanup Worker
+            if (cloudWorkerId) {
+                this.log('Cleaning up cloud worker...');
+                try {
+                    await this.destFunctions.delete(cloudWorkerId);
+                } catch(e) { console.warn('Failed to delete worker', e); }
+            }
+        }
 
         this.log('Migration completed.');
         this.clearCheckpoint();
+    }
+
+    // --- CLOUD WORKER HELPERS ---
+    private async deployCloudWorker(): Promise<string> {
+        this.log('🚀 Deploying Cloud Proxy Worker to Destination Project...');
+        const workerName = '_dv_migration_worker';
+        const functionId = ID.unique();
+        
+        // 1. Create Function
+        const func = await this.destFunctions.create(
+            functionId,
+            workerName,
+            'node-18.0', // Standard runtime
+            undefined, // events
+            undefined, // schedule
+            15, // timeout (short is fine, we invoke per file)
+            true, // enabled
+            true // logging
+        );
+
+        // 2. Code Bundle
+        const packageJson = JSON.stringify({
+            name: "migration-worker",
+            type: "module",
+            dependencies: { "node-appwrite": "^14.0.0" }
+        });
+
+        const indexJs = `
+        import { Client, Storage, InputFile } from 'node-appwrite';
+
+        export default async ({ req, res, log, error }) => {
+            try {
+                if (!req.body) throw new Error("Missing body");
+                const payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+                const { sourceEndpoint, sourceProject, sourceKey, destEndpoint, destProject, destKey, bucketId, fileId } = payload;
+
+                log(\`Cloud Proxy: Migrating file \${fileId} in bucket \${bucketId}\`);
+
+                const sourceClient = new Client().setEndpoint(sourceEndpoint).setProject(sourceProject).setKey(sourceKey);
+                const sourceStorage = new Storage(sourceClient);
+
+                const destClient = new Client().setEndpoint(destEndpoint).setProject(destProject).setKey(destKey);
+                const destStorage = new Storage(destClient);
+
+                // 1. Get Metadata
+                const fileMeta = await sourceStorage.getFile(bucketId, fileId);
+
+                // 2. Download Buffer
+                const buffer = await sourceStorage.getFileDownload(bucketId, fileId);
+
+                // 3. Upload to Destination
+                // InputFile.fromBuffer works in Node runtime
+                await destStorage.createFile(
+                    bucketId,
+                    fileId,
+                    InputFile.fromBuffer(Buffer.from(buffer), fileMeta.name),
+                    fileMeta.$permissions
+                );
+
+                return res.json({ success: true, fileId });
+            } catch (e) {
+                error(e.message);
+                return res.json({ success: false, error: e.message }, 500);
+            }
+        };
+        `;
+
+        // 3. Deploy
+        await deployCodeFromString(
+            this.destProjectConfig,
+            func.$id,
+            [
+                { name: 'package.json', content: packageJson },
+                { name: 'src/main.js', content: indexJs }
+            ],
+            true, // activate
+            'src/main.js',
+            'npm install'
+        );
+
+        this.log(`Worker deployed (${func.$id}). Waiting for build...`);
+        
+        // Wait for build (simple polling)
+        let tries = 0;
+        while(tries < 20) {
+            await new Promise(r => setTimeout(r, 2000));
+            const deployments = await this.destFunctions.listDeployments(func.$id, [Query.orderDesc('$createdAt'), Query.limit(1)]);
+            if (deployments.deployments.length > 0 && deployments.deployments[0].status === 'ready') {
+                this.log('Worker is ready.');
+                return func.$id;
+            }
+            if (deployments.deployments.length > 0 && deployments.deployments[0].status === 'failed') {
+                throw new Error('Worker build failed.');
+            }
+            tries++;
+        }
+        throw new Error('Worker build timed out.');
+    }
+
+    private async executeCloudTransfer(workerId: string, bucketId: string, fileId: string) {
+        const payload = JSON.stringify({
+            sourceEndpoint: this.sourceProjectConfig.endpoint,
+            sourceProject: this.sourceProjectConfig.projectId,
+            sourceKey: this.sourceProjectConfig.apiKey,
+            destEndpoint: this.destProjectConfig.endpoint,
+            destProject: this.destProjectConfig.projectId,
+            destKey: this.destProjectConfig.apiKey,
+            bucketId,
+            fileId
+        });
+
+        const execution = await this.destFunctions.createExecution(workerId, payload, false); // Sync execution
+        
+        if (execution.status === 'failed') {
+            throw new Error(`Worker execution failed: ${execution.responseBody || execution.errors}`);
+        }
+        
+        const response = JSON.parse(execution.responseBody);
+        if (!response.success) {
+            throw new Error(response.error);
+        }
     }
 
     // --- DATABASES ---
@@ -476,7 +624,7 @@ export class MigrationService {
 
 
     // --- STORAGE ---
-    private async migrateStorage(buckets: MigrationResource[], migrateFiles: boolean, resume: boolean) {
+    private async migrateStorage(buckets: MigrationResource[], migrateFiles: boolean, resume: boolean, cloudWorkerId: string | null) {
         this.log('Migrating Storage...');
         for (const res of buckets) {
             this.checkStop();
@@ -497,12 +645,12 @@ export class MigrationService {
             }
 
             if (migrateFiles) {
-                await this.migrateFiles(res.sourceId, res.targetId, resume);
+                await this.migrateFiles(res.sourceId, res.targetId, resume, cloudWorkerId);
             }
         }
     }
 
-    private async migrateFiles(sourceBucketId: string, targetBucketId: string, resume: boolean) {
+    private async migrateFiles(sourceBucketId: string, targetBucketId: string, resume: boolean, cloudWorkerId: string | null) {
         const cursorKey = `file_${sourceBucketId}`;
         let cursor = resume ? this.getCursor(cursorKey) : undefined;
         let count = 0;
@@ -525,29 +673,35 @@ export class MigrationService {
                     await this.destStorage.getFile(targetBucketId, file.$id);
                 } catch (e) {
                     try {
-                        const buffer = await this.sourceStorage.getFileDownload(sourceBucketId, file.$id);
-                        const blob = new Blob([buffer]);
-                        const fileObj = new File([blob], file.name);
-                        
-                        const formData = new FormData();
-                        formData.append('fileId', file.$id);
-                        formData.append('file', fileObj);
-                        if (file.$permissions) {
-                            file.$permissions.forEach((p, i) => formData.append(`permissions[${i}]`, p));
+                        if (cloudWorkerId) {
+                            // CLOUD MODE
+                            await this.executeCloudTransfer(cloudWorkerId, targetBucketId, file.$id);
+                        } else {
+                            // LOCAL MODE (Browser Buffer)
+                            const buffer = await this.sourceStorage.getFileDownload(sourceBucketId, file.$id);
+                            const blob = new Blob([buffer]);
+                            const fileObj = new File([blob], file.name);
+                            
+                            const formData = new FormData();
+                            formData.append('fileId', file.$id);
+                            formData.append('file', fileObj);
+                            if (file.$permissions) {
+                                file.$permissions.forEach((p, i) => formData.append(`permissions[${i}]`, p));
+                            }
+
+                            const destEndpoint = (this.destClient as any).config.endpoint;
+                            const destProject = (this.destClient as any).config.project;
+                            const destKey = (this.destClient as any).config.key;
+
+                            await fetch(`${destEndpoint}/storage/buckets/${targetBucketId}/files`, {
+                                method: 'POST',
+                                headers: {
+                                    'X-Appwrite-Project': destProject,
+                                    'X-Appwrite-Key': destKey,
+                                },
+                                body: formData,
+                            });
                         }
-
-                        const destEndpoint = (this.destClient as any).config.endpoint;
-                        const destProject = (this.destClient as any).config.project;
-                        const destKey = (this.destClient as any).config.key;
-
-                        await fetch(`${destEndpoint}/storage/buckets/${targetBucketId}/files`, {
-                            method: 'POST',
-                            headers: {
-                                'X-Appwrite-Project': destProject,
-                                'X-Appwrite-Key': destKey,
-                            },
-                            body: formData,
-                        });
                         count++;
                     } catch (err) {
                         this.error(`migrating file ${file.$id}`, err);

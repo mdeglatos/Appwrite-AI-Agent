@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { AppwriteProject } from '../../../types';
 import { MigrationService, type MigrationOptions, type MigrationPlan, type MigrationResource } from '../../../services/migrationService';
-import { MigrationIcon, LoadingSpinnerIcon, WarningIcon, CheckIcon, ChevronDownIcon, ArrowLeftIcon, DatabaseIcon, StorageIcon, FunctionIcon, TeamIcon, UserIcon, DeleteIcon, RefreshIcon } from '../../Icons';
+import { MigrationIcon, LoadingSpinnerIcon, WarningIcon, CheckIcon, ChevronDownIcon, ArrowLeftIcon, DatabaseIcon, StorageIcon, FunctionIcon, TeamIcon, UserIcon, DeleteIcon, RefreshIcon, RiRocketLine } from '../../Icons';
 
 interface MigrationsTabProps {
     activeProject: AppwriteProject;
@@ -54,6 +54,7 @@ export const MigrationsTab: React.FC<MigrationsTabProps> = ({ activeProject, pro
         migrateTeams: true,
         migrateDocuments: true,
         migrateFiles: true,
+        useCloudProxy: false,
     });
 
     // Workflow State
@@ -269,7 +270,7 @@ export const MigrationsTab: React.FC<MigrationsTabProps> = ({ activeProject, pro
                         <div>
                             <h3 className="text-lg font-semibold text-gray-200 mb-4">What to Migrate?</h3>
                             <div className="space-y-3 mb-8">
-                                {Object.keys(options).map((key) => {
+                                {Object.keys(options).filter(k => k !== 'useCloudProxy').map((key) => {
                                     const k = key as keyof MigrationOptions;
                                     return (
                                         <label key={k} className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-gray-700/30 transition-colors">
@@ -283,6 +284,22 @@ export const MigrationsTab: React.FC<MigrationsTabProps> = ({ activeProject, pro
                                         </label>
                                     );
                                 })}
+                                
+                                <div className="border-t border-gray-700/50 my-2 pt-2"></div>
+                                <label className="flex items-start gap-3 cursor-pointer p-3 rounded bg-purple-900/10 border border-purple-500/20 hover:bg-purple-900/20 transition-colors">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={options.useCloudProxy} 
+                                        onChange={e => setOptions({...options, useCloudProxy: e.target.checked})}
+                                        className="w-5 h-5 mt-0.5 rounded border-gray-600 bg-gray-900 text-purple-500 focus:ring-purple-500"
+                                    />
+                                    <div>
+                                        <span className="text-sm text-purple-300 font-bold flex items-center gap-2"><RiRocketLine size={14} /> Use Cloud Proxy (Serverless)</span>
+                                        <p className="text-xs text-purple-200/70 mt-1">
+                                            Deploys a temporary Cloud Function to transfer files directly between servers. Faster & saves your bandwidth.
+                                        </p>
+                                    </div>
+                                </label>
                             </div>
                         </div>
                         
