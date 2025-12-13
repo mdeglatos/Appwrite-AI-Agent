@@ -18,6 +18,7 @@ import { FunctionsTab } from './studio/tabs/FunctionsTab';
 import { UsersTab } from './studio/tabs/UsersTab';
 import { TeamsTab } from './studio/tabs/TeamsTab';
 import { MigrationsTab } from './studio/tabs/MigrationsTab';
+import { ConsolidateBucketsModal } from './studio/ConsolidateBucketsModal';
 
 interface StudioProps {
     activeProject: AppwriteProject;
@@ -60,6 +61,9 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, projects, databas
     const [modal, setModal] = useState<ModalState | null>(null);
     const [modalLoading, setModalLoading] = useState(false);
     const [formValues, setFormValues] = useState<any>({});
+    
+    // -- New Feature State --
+    const [isConsolidateModalOpen, setIsConsolidateModalOpen] = useState(false);
     
     const closeModal = () => {
         setModal(null);
@@ -770,6 +774,7 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, projects, databas
                             buckets={buckets} selectedBucket={selectedBucket} files={files}
                             onCreateBucket={handleCreateBucket} onDeleteBucket={handleDeleteBucket} onSelectBucket={setSelectedBucket}
                             onDeleteFile={handleDeleteFile}
+                            onConsolidateBuckets={() => setIsConsolidateModalOpen(true)}
                         />
                     )}
 
@@ -804,7 +809,7 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, projects, databas
                 </div>
             </div>
 
-            {/* Modal Renderer */}
+            {/* General Modal Renderer */}
             {modal && modal.isOpen && (
                 <Modal isOpen={modal.isOpen} onClose={closeModal} title={modal.title} size={modal.size}>
                     <div className="space-y-4">
@@ -893,6 +898,20 @@ export const Studio: React.FC<StudioProps> = ({ activeProject, projects, databas
                     </div>
                 </Modal>
             )}
+            
+            {/* Consolidate Modal */}
+            <ConsolidateBucketsModal 
+                isOpen={isConsolidateModalOpen}
+                onClose={() => setIsConsolidateModalOpen(false)}
+                buckets={buckets}
+                activeProject={activeProject}
+                onSuccess={() => {
+                    refreshData();
+                    if (selectedBucket) {
+                        fetchFiles(selectedBucket.$id);
+                    }
+                }}
+            />
         </div>
     );
 };

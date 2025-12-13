@@ -3,7 +3,7 @@ import React from 'react';
 import { IoSend, IoAttach } from 'react-icons/io5';
 import { CgSpinner } from 'react-icons/cg';
 import { FaUser } from 'react-icons/fa';
-import { RiRobot2Line, RiSettings3Line, RiAddCircleLine, RiDeleteBinLine, RiCheckLine, RiCloseLine, RiTerminalBoxLine, RiMenuLine, RiToolsLine, RiLogoutBoxRLine, RiArrowDownSLine, RiArrowUpSLine, RiStackLine, RiFileUploadFill, RiFile3Line, RiKey2Line, RiRefreshLine, RiFileCopyLine, RiCodeSSlashLine, RiCompass3Line, RiErrorWarningLine, RiFolderLine, RiFileAddLine, RiFolderAddLine, RiPencilLine, RiLayoutMasonryLine, RiDashboardLine, RiDatabase2Line, RiHardDrive2Line, RiGroupLine, RiFlashlightLine, RiArrowLeftSLine, RiEyeLine, RiShareForwardLine, RiRocketLine as _RiRocketLine } from 'react-icons/ri';
+import { RiRobot2Line, RiSettings3Line, RiAddCircleLine, RiDeleteBinLine, RiCheckLine, RiCloseLine, RiTerminalBoxLine, RiMenuLine, RiToolsLine, RiLogoutBoxRLine, RiArrowDownSLine, RiArrowUpSLine, RiStackLine, RiFileUploadFill, RiFile3Line, RiKey2Line, RiRefreshLine, RiFileCopyLine, RiCodeSSlashLine, RiCompass3Line, RiErrorWarningLine, RiFolderLine, RiFileAddLine, RiFolderAddLine, RiPencilLine, RiLayoutMasonryLine, RiDashboardLine, RiDatabase2Line, RiHardDrive2Line, RiGroupLine, RiFlashlightLine, RiArrowLeftSLine, RiEyeLine, RiShareForwardLine as _RiShareForwardLine, RiRocketLine as _RiRocketLine } from 'react-icons/ri';
 
 interface IconProps {
     size?: number;
@@ -60,5 +60,6 @@ export const DatabaseIcon: React.FC<IconProps> = ({ size = 20, className }) => <
 export const StorageIcon: React.FC<IconProps> = ({ size = 20, className }) => <RiHardDrive2Line size={size} className={className} />;
 export const FunctionIcon: React.FC<IconProps> = ({ size = 20, className }) => <RiFlashlightLine size={size} className={className} />;
 export const TeamIcon: React.FC<IconProps> = ({ size = 20, className }) => <RiGroupLine size={size} className={className} />;
-export const MigrationIcon: React.FC<IconProps> = ({ size = 20, className }) => <RiShareForwardLine size={size} className={className} />;
+export const MigrationIcon: React.FC<IconProps> = ({ size = 20, className }) => <_RiShareForwardLine size={size} className={className} />;
+export const RiShareForwardLine: React.FC<IconProps> = ({ size = 20, className }) => <_RiShareForwardLine size={size} className={className} />;
 export const RiRocketLine: React.FC<IconProps> = ({ size = 20, className }) => <_RiRocketLine size={size} className={className} />;
